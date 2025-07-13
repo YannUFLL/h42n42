@@ -1,25 +1,26 @@
 open Eliom_content.Html.F
 
-let%client draw ctx ((r, g, b), size, (x1, y1), (x2, y2)) =
-  let color = CSS.Color.string_of_t (CSS.Color.rgb r g b) in
-  ctx##.strokeStyle := Js.string color;
-  ctx##.lineWidth := float size;
-  ctx##beginPath;
-  ctx##(moveTo (float x1) (float y1));
-  ctx##(lineTo (float x2) (float y2));
-  ctx##stroke
+let%server game_area =
+  div ~a:[a_id "game_area"; a_style "position: relative; width: 1000px; height: 600px;"]
+    [ div ~a:[a_id "river"; a_style "height:50px; background:blue;"] []
+    ; div ~a:[a_id "playground"; a_style "height:500px; background:white; position:relative;"] []
+    ; div ~a:[a_id "hospital"; a_style "height:50px; background:red;"] []
+    ]
 
-let%server creet_canvas =
-  Eliom_content.Html.F.canvas
-    ~a:[a_id "creet-canvas"; a_width 1000; a_height 800]
-    [txt "Your browser does not support canvas"]
 
-let%client init_client () =
-  let canvas = Eliom_content.Html5.To_dom.of_canvas ~%creet_canvas in
-  let ctx = canvas##(getContext Dom_html._2d_) in
-  ctx##.lineCap := Js.string "round";
-  draw ctx ((0, 0, 0), 12, (10, 10), (200, 100))
+let%client create_creet id x y =
+  let open Js_of_ocaml in
+  let playground = Dom_html.getElementById "playground" in
+  let creet = Dom_html.createDiv  Dom_html.document in
+  creet##.id := Js.string id;
+  creet##.className := Js.string "creet";
+  creet##.style##.left := Js.string (Printf.sprintf "%dpx" x);
+  creet##.style##.top := Js.string (Printf.sprintf "%dpx" y);
+  Dom.appendChild playground creet;
+  creet
 
-let test1 = 42
-let%server test2 = 42
-let%client test4 = 42
+  let%client init_client () =
+  let _ = create_creet "creet1" 100 100 in
+  ()
+
+let%client print_coucou () = print_int 42

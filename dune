@@ -4,7 +4,7 @@
  (name h42n42)
  (modules
   (:standard \  H42n42_main ))
- (libraries eliom.server ocsipersist-sqlite ocsipersist-sqlite.settings)
+ (libraries eliom.server ocsipersist-sqlite ocsipersist-sqlite.settings )
  (library_flags
   (:standard -linkall))
  (wrapped false)
@@ -115,7 +115,7 @@
     use-js-string
     --no-source-map))
   ; source maps are slow...
-  (libraries eliom.client))
+  (libraries eliom.client js_of_ocaml-lwt))
  (dynamic_include ../gen/dune.client))
 
 ; Main rule:

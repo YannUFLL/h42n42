@@ -37,12 +37,11 @@ let%server main_page () =
         [ css_link ~uri:(make_uri ~service:(Eliom_service.static_dir ()) ["css"; "h42n42.css"]) () ])
       (body  [Game.game_area]))
 
-let%client init_client () =
-Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string "bonjour")
+
     
 let%server () =
   App.register ~service:main_service (fun () () ->
-    let _ = [%client (init_client () : unit)] in
+    let _ = [%client (Game.init_client () : unit)] in
     Lwt.return (main_page ()))
 
 

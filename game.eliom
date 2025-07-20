@@ -1,26 +1,294 @@
 open Eliom_content.Html.F
 
+[%%client
+open Js_of_ocaml
+open Js_of_ocaml_lwt
+
+type creet_state = Healthy | Infected | Berserk | Mean
+
+type creet =
+  { id : string
+  ; mutable x : float
+  ; mutable y : float
+  ; mutable dx : float
+  ; mutable dy : float
+  ; mutable state : creet_state
+  ; mutable available : bool
+  ; mutable r_size : int
+  ; mutable infected_time : float
+  ; dom : Dom_html.divElement Js.t }
+
+type game_state =
+  {mutable creets : creet list; mutable is_running : bool; mutable timer : float}]
+
+let%shared creet_base_radius = 15
+let%shared r_growing_speed = 1
+let%shared river_height = 50
+let%shared hospital_height = 50
+let%shared game_area_height = 600
+let%shared game_area_width = 600
+let%shared playground_height = 500
+let%shared mean_color = "red"
+let%shared berserk_color = "orange"
+let%shared infected_color = "green"
+let%shared healthy_color = "gray"
+let%shared game_acceleration = 0.001
+let%shared direction_change_probability = 0.005
+let%shared creet_duplication_chance = 0.002
+let%shared number_of_creet_at_start = 10
+let%shared time_to_die : float = 15.0
+
 let%server game_area =
-  div ~a:[a_id "game_area"; a_style "position: relative; width: 1000px; height: 600px;"]
-    [ div ~a:[a_id "river"; a_style "height:50px; background:blue;"] []
-    ; div ~a:[a_id "playground"; a_style "height:500px; background:white; position:relative;"] []
-    ; div ~a:[a_id "hospital"; a_style "height:50px; background:red;"] []
-    ]
+  div
+    ~a:
+      [ a_id "game_area"
+      ; a_style
+          ("position: relative; width: "
+          ^ string_of_int game_area_width
+          ^ "px; height: "
+          ^ string_of_int game_area_height
+          ^ "px;") ]
+    [ div
+        ~a:
+          [ a_id "river"
+          ; a_style
+              ("height:" ^ string_of_int river_height ^ "px; background:blue;")
+          ]
+        []
+    ; div
+        ~a:
+          [ a_id "playground"
+          ; a_style
+              ("height:"
+              ^ string_of_int playground_height
+              ^ "px; background:white; position:relative;") ]
+        []
+    ; div
+        ~a:
+          [ a_id "hospital"
+          ; a_style
+              ("height:" ^ string_of_int hospital_height ^ "px; background:red;")
+          ]
+        [] ]
+
+let%client check_collision c1 c2 =
+  let dx = c1.x -. c2.x in
+  let dy = c1.y -. c2.y in
+  let dist2 = sqrt ((dx *. dx) +. (dy *. dy)) in
+  Js_of_ocaml.Firebug.console##log
+    (Js_of_ocaml.Js.string (string_of_float dist2));
+  dist2 < float_of_int (c1.r_size + c2.r_size)
+
+let%client propagate_infection game_state =
+  List.iter
+    (fun c1 ->
+       match c1.state with
+       | Infected | Mean | Berserk ->
+           List.iter
+             (fun c2 ->
+                if
+                  ((not (c2.state = Infected))
+                  && (not (c2.state = Berserk))
+                  && not (c2.state = Mean))
+                  && check_collision c1 c2
+                  && Random.int 100 < 2
+                then (
+                  let n = Random.int 10 in
+                  let new_state =
+                    if n = 0
+                    then Berserk (* 1/10 *)
+                    else if n = 1
+                    then Mean (* 1/10 *)
+                    else Infected (* 8/10 *)
+                  in
+                  c2.state <- new_state;
+                  c2.infected_time <- game_state.timer;
+                  c2.dom##.style##.backgroundColor
+                  := Js.string
+                       (match new_state with
+                       | Berserk -> berserk_color
+                       | Mean -> mean_color
+                       | Infected -> infected_color
+                       | Healthy -> healthy_color)))
+             game_state.creets
+       | _ -> ())
+    game_state.creets
+
+let%client closest_healthy_creet creet creets =
+  List.filter (fun c -> c.state = Healthy) creets
+  |> List.fold_left
+       (fun (min_c, min_dist) c ->
+          let dx = c.x -. creet.x in
+          let dy = c.y -. creet.y in
+          let dist = (dx *. dx) +. (dy *. dy) in
+          match min_c with
+          | None -> Some c, dist
+          | Some _ when dist < min_dist -> Some c, dist
+          | _ -> min_c, min_dist)
+       (None, max_float)
+  |> fst
+
+let%client check_border_collision creet =
+  if creet.x < 0.
+  then (
+    creet.x <- 0.;
+    creet.dx <- -.creet.dx)
+  else if creet.x > float_of_int (game_area_width - (creet.r_size * 2))
+  then (
+    creet.x <- float_of_int (game_area_width - (creet.r_size * 2));
+    creet.dx <- -.creet.dx);
+  if creet.y < 0.
+  then (
+    creet.y <- 0.;
+    creet.dy <- -.creet.dy)
+  else if creet.y > float_of_int (game_area_height - (creet.r_size * 2))
+  then (
+    creet.y <- float_of_int (game_area_height - (creet.r_size * 2));
+    creet.dy <- -.creet.dy)
+
+let%client handle_infected_creet game_state creet =
+  match creet.state with
+  | Berserk ->
+      if creet.r_size < 4 * creet_base_radius
+      then (
+        creet.r_size <- creet.r_size + r_growing_speed;
+        creet.dom##.style##.width
+        := Js.string (string_of_int (creet.r_size * 2) ^ "px");
+        creet.dom##.style##.height
+        := Js.string (string_of_int (creet.r_size * 2) ^ "px"))
+  | Mean -> (
+    match closest_healthy_creet creet game_state.creets with
+    | Some target ->
+        let dx = target.x -. creet.x in
+        let dy = target.y -. creet.y in
+        let dist = sqrt ((dx *. dx) +. (dy *. dy)) +. 0.0001 in
+        let speed = 1.5 in
+        creet.dx <- dx /. dist *. speed;
+        creet.dy <- dy /. dist *. speed
+    | None -> ())
+  | _ -> ()
+
+let%client check_river creet =
+  if creet.state = Healthy && creet.y <= float_of_int river_height
+  then (
+    creet.state <- Infected;
+    creet.dom##.style##.backgroundColor := Js.string infected_color)
+
+let%client random_rotation creet =
+  if Random.float 1.0 < direction_change_probability
+  then (
+    let angle = Random.float (2. *. Float.pi) in
+    let speed = sqrt ((creet.dx *. creet.dx) +. (creet.dy *. creet.dy)) in
+    creet.dx <- cos angle *. speed;
+    creet.dy <- sin angle *. speed)
+
+let%client check_alive game_state creet = 
+if (game_state.time -  creet.infected_time > time_to_die) then begin
+  creet.##dom 
 
 
-let%client create_creet id x y =
-  let open Js_of_ocaml in
-  let playground = Dom_html.getElementById "playground" in
-  let creet = Dom_html.createDiv  Dom_html.document in
+let%client rec game_loop (game_state : game_state) =
+  let open Lwt in
+  List.iter
+    (fun creet ->
+       if creet.available
+       then (
+         let speed = sqrt ((creet.dx *. creet.dx) +. (creet.dy *. creet.dy)) in
+         let new_speed = speed +. game_acceleration in
+         if speed > 0.0
+         then (
+           let ratio = new_speed /. speed in
+           creet.dx <- creet.dx *. ratio;
+           creet.dy <- creet.dy *. ratio);
+         random_rotation creet;
+         creet.x <- creet.x +. creet.dx;
+         creet.y <- creet.y +. creet.dy;
+         check_border_collision creet;
+         check_river creet);
+       creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" creet.x);
+       creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" creet.y);
+       handle_infected_creet game_state creet)
+    game_state.creets;
+  propagate_infection game_state;
+  game_state.timer <- game_state.timer +. 0.02;
+  Lwt_js.sleep 0.02 >>= fun () -> game_loop game_state
+
+let%client create_creet id x y infected =
+  let playground = Dom_html.getElementById "game_area" in
+  let creet = Dom_html.createDiv Dom_html.document in
   creet##.id := Js.string id;
   creet##.className := Js.string "creet";
+  creet##.style##.position := Js.string "absolute";
   creet##.style##.left := Js.string (Printf.sprintf "%dpx" x);
   creet##.style##.top := Js.string (Printf.sprintf "%dpx" y);
+  creet##.style##.width
+  := Js.string (string_of_int (creet_base_radius * 2) ^ "px");
+  creet##.style##.height
+  := Js.string (string_of_int (creet_base_radius * 2) ^ "px");
+  creet##.style##.backgroundColor
+  := Js.string (if infected then infected_color else healthy_color);
   Dom.appendChild playground creet;
   creet
 
-  let%client init_client () =
-  let _ = create_creet "creet1" 100 100 in
-  ()
+let%client enable_drag creet =
+  let game_left = 0. in
+  let game_top = 0. in
+  let game_right = float_of_int (game_area_width - (creet.r_size * 2)) in
+  let game_bottom = float_of_int (game_area_height - (creet.r_size * 2)) in
+  let hospital_start = float_of_int (game_area_height - hospital_height) in
+  Lwt_js_events.mousedowns creet.dom (fun _ _ ->
+    let%lwt () =
+      Lwt.pick
+        [
+          Lwt_js_events.mousemoves Dom_html.document (fun move_ev _ ->
+            let x_raw =
+              float_of_int move_ev##.clientX -. float_of_int creet.r_size
+            in
+            let y_raw =
+              float_of_int move_ev##.clientY -. float_of_int creet.r_size
+            in
+            let x = max game_left (min game_right x_raw) in
+            let y = max game_top (min game_bottom y_raw) in
+            creet.x <- x;
+            creet.y <- y;
+            creet.available <- false;
+            creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" x);
+            creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" y);
+            Lwt.return ())
+        ; (let%lwt _ = Lwt_js_events.mouseup Dom_html.document in
+           if creet.y +. float_of_int creet.r_size >= hospital_start
+           then (
+             creet.state <- Healthy;
+             creet.dom##.style##.backgroundColor := Js.string healthy_color);
+           creet.available <- true;
+           Lwt.return ()) ]
+    in
+    Lwt.return ())
 
-let%client print_coucou () = print_int 42
+let%client init_client () =
+  Random.self_init ();
+  let creets = ref [] in
+  for i = 0 to 9 do
+    let x = Random.int game_area_width - (creet_base_radius * 2) in
+    let y = Random.int game_area_height - (creet_base_radius * 2) in
+    let dx = (2.0 *. Random.float 1.0) -. 1.0 in
+    let dy = (2.0 *. Random.float 1.0) -. 1.0 in
+    let infected = i = 0 in
+    let dom = create_creet ("creet" ^ string_of_int i) x y infected in
+    let c =
+      { id = "creet" ^ string_of_int i
+      ; x = float_of_int x
+      ; y = float_of_int y
+      ; dx
+      ; dy
+      ; state = (if infected then Infected else Healthy)
+      ; available = true
+      ; r_size = creet_base_radius
+      ; dom }
+    in
+    Lwt.async (fun () -> enable_drag c);
+    creets := c :: !creets
+  done;
+  let game_state = {creets = !creets; is_running = true; timer = 0.0} in
+  Lwt.async (fun () -> game_loop game_state)
+

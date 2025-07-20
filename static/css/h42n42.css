@@ -6,12 +6,14 @@
     background-color: blue;
 }
 
+body {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 
 .creet {
-  width: 40px;
-  height: 40px;
-  background: green;
-  position: absolute;
-  border-radius: 20px;
+  border-radius: 50%;
   z-index: 10;
 }

@@ -28,7 +28,7 @@ let%shared hospital_height = 50
 let%shared game_area_height = 600
 let%shared game_area_width = 600
 let%shared playground_height = 500
-let%shared mean_color = "red"
+let%shared mean_color = "violet"
 let%shared berserk_color = "orange"
 let%shared infected_color = "green"
 let%shared healthy_color = "gray"
@@ -37,7 +37,7 @@ let%shared direction_change_probability = 0.005
 let%shared creet_duplication_chance = 0.0001
 let%shared number_of_creet_at_start = 5
 let%shared time_to_die : float = 15.0
-let%shared shrink_speed = 0.00
+let%shared shrink_speed = 0.005
 let%shared mean_reduce_factor = 0.5
 let%shared death_random_factor = 0.05
 

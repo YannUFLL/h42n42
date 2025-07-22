@@ -107,23 +107,17 @@ let%client infect_creet game_state creet =
        | Infected -> infected_color
        | Healthy -> healthy_color)
 
-let%client propagate_infection game_state =
-  List.iter
-    (fun c1 ->
-       match c1.state with
-       | Infected | Mean | Berserk ->
-           List.iter
-             (fun c2 ->
-                if
-                  ((not (c2.state = Infected))
-                  && (not (c2.state = Berserk))
-                  && not (c2.state = Mean))
-                  && check_collision c1 c2
-                  && Random.int 100 < 2
-                then infect_creet game_state c2)
-             game_state.creets
-       | _ -> ())
-    game_state.creets
+let%client propagate_infection game_state creet =
+  if creet.state = Infected || creet.state = Berserk || creet.state = Mean
+  then
+    List.iter
+      (fun target ->
+         if
+           target != creet && target.state = Healthy && target.available
+           && check_collision creet target
+           && Random.int 100 < 2
+         then infect_creet game_state target)
+      game_state.creets
 
 let%client closest_healthy_creet creet creets =
   List.filter (fun c -> c.state = Healthy) creets
@@ -353,16 +347,18 @@ let%client rec game_loop (game_state : game_state) =
              creet.x <- creet.x +. creet.dx;
              creet.y <- creet.y +. creet.dy;
              check_border_collision creet;
-             check_river game_state creet);
-           check_alive game_state creet;
-           maybe_duplicate_creet game_state creet;
-           creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" creet.x);
-           creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" creet.y);
-           handle_infected_creet game_state creet;
-           return_to_normal_size creet)
+             check_river game_state creet;
+             check_alive game_state creet;
+             creet.dom##.style##.left
+             := Js.string (Printf.sprintf "%fpx" creet.x);
+             creet.dom##.style##.top
+             := Js.string (Printf.sprintf "%fpx" creet.y);
+             propagate_infection game_state creet;
+             maybe_duplicate_creet game_state creet;
+             handle_infected_creet game_state creet;
+             return_to_normal_size creet))
         game_state.creets
     in
-    propagate_infection game_state;
     game_state.timer <- game_state.timer +. 0.02;
     Lwt_js.sleep 0.02 >>= fun () -> game_loop game_state
 

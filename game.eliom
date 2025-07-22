@@ -14,6 +14,7 @@ type creet =
   ; mutable dy : float
   ; mutable state : creet_state
   ; mutable available : bool
+  ; mutable is_dead : bool
   ; mutable r_size : float
   ; mutable infected_time : float
   ; mutable move_listener : Dom_html.event_listener_id option
@@ -216,6 +217,7 @@ let%client remove_creet game_state creet =
   Option.iter Dom_html.removeEventListener creet.up_listener;
   creet.move_listener <- None;
   creet.up_listener <- None;
+  creet.is_dead <- true;
   (match Js.Opt.to_option creet.dom##.parentNode with
   | Some parent -> Dom.removeChild parent creet.dom
   | None -> ());
@@ -316,7 +318,35 @@ let%client enable_drag creet =
     (Dom_html.addEventListener creet.dom Dom_html.Event.mousedown
        (Dom_html.handler on_down) Js._false)
 
-let%client maybe_duplicate_creet game_state creet =
+let%client rec creet_loop (game_state : game_state) creet =
+  let open Lwt in
+  if not game_state.is_running
+  then Lwt.return_unit
+  else (
+    if creet.available
+    then (
+      let speed = sqrt ((creet.dx *. creet.dx) +. (creet.dy *. creet.dy)) in
+      let new_speed = speed +. game_acceleration in
+      if speed > 0.0
+      then (
+        let ratio = new_speed /. speed in
+        creet.dx <- creet.dx *. ratio;
+        creet.dy <- creet.dy *. ratio);
+      random_rotation creet;
+      creet.x <- creet.x +. creet.dx;
+      creet.y <- creet.y +. creet.dy;
+      check_border_collision creet;
+      check_river game_state creet;
+      creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" creet.x);
+      creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" creet.y);
+      maybe_duplicate_creet game_state creet;
+      handle_infected_creet game_state creet;
+      return_to_normal_size creet);
+    check_alive game_state creet;
+    propagate_infection game_state creet;
+    Lwt_js.sleep 0.02 >>= fun () -> creet_loop game_state creet)
+
+and maybe_duplicate_creet game_state creet =
   if creet.state = Healthy && Random.float 1.0 < creet_duplication_chance
   then (
     let id = generate_unique_id game_state in
@@ -333,6 +363,7 @@ let%client maybe_duplicate_creet game_state creet =
       ; dy
       ; state = Healthy
       ; available = true
+      ; is_dead = false
       ; r_size = float_of_int creet_base_radius
       ; infected_time = 0.0
       ; move_listener = None
@@ -340,47 +371,21 @@ let%client maybe_duplicate_creet game_state creet =
       ; dom }
     in
     enable_drag new_creet;
+    Lwt.async (fun () -> creet_loop game_state new_creet);
     game_state.creets <- new_creet :: game_state.creets)
 
-let%client rec game_loop (game_state : game_state) =
+let%client rec game_master_loop game_state =
   let open Lwt in
   if
     game_state.creets = []
     || not (List.exists (fun c -> c.state = Healthy) game_state.creets)
-  then (show_game_over (); Lwt.return_unit)
-  else
-    let () =
-      List.iter
-        (fun creet ->
-           if creet.available
-           then (
-             let speed =
-               sqrt ((creet.dx *. creet.dx) +. (creet.dy *. creet.dy))
-             in
-             let new_speed = speed +. game_acceleration in
-             if speed > 0.0
-             then (
-               let ratio = new_speed /. speed in
-               creet.dx <- creet.dx *. ratio;
-               creet.dy <- creet.dy *. ratio);
-             random_rotation creet;
-             creet.x <- creet.x +. creet.dx;
-             creet.y <- creet.y +. creet.dy;
-             check_border_collision creet;
-             check_river game_state creet;
-             creet.dom##.style##.left
-             := Js.string (Printf.sprintf "%fpx" creet.x);
-             creet.dom##.style##.top
-             := Js.string (Printf.sprintf "%fpx" creet.y);
-             maybe_duplicate_creet game_state creet;
-             handle_infected_creet game_state creet;
-             return_to_normal_size creet);
-           check_alive game_state creet;
-           propagate_infection game_state creet)
-        game_state.creets
-    in
+  then (
+    show_game_over ();
+    game_state.is_running <- false;
+    Lwt.return_unit)
+  else (
     game_state.timer <- game_state.timer +. 0.02;
-    Lwt_js.sleep 0.02 >>= fun () -> game_loop game_state
+    Lwt_js.sleep 0.02 >>= fun () -> game_master_loop game_state)
 
 let%client init_client () =
   Random.self_init ();
@@ -400,6 +405,7 @@ let%client init_client () =
       ; dy
       ; state = (if infected then Infected else Healthy)
       ; available = true
+      ; is_dead = false
       ; r_size = float_of_int creet_base_radius
       ; infected_time = 0.0
       ; move_listener = None
@@ -410,4 +416,7 @@ let%client init_client () =
     creets := c :: !creets
   done;
   let game_state = {creets = !creets; is_running = true; timer = 0.0} in
-  Lwt.async (fun () -> game_loop game_state)
+  List.iter
+    (fun c -> Lwt.async (fun () -> creet_loop game_state c))
+    game_state.creets;
+  Lwt.async (fun () -> game_master_loop game_state)

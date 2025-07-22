@@ -370,7 +370,7 @@ let%client init_client () =
     let y = Random.int game_area_height - (creet_base_radius * 2) in
     let dx = (2.0 *. Random.float 1.0) -. 1.0 in
     let dy = (2.0 *. Random.float 1.0) -. 1.0 in
-    let infected = i = 0 in
+    let infected = false in
     let dom = create_creet ("creet" ^ string_of_int i) x y infected in
     let c =
       { id = "creet" ^ string_of_int i

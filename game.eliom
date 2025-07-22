@@ -21,7 +21,7 @@ type creet =
 type game_state =
   {mutable creets : creet list; mutable is_running : bool; mutable timer : float}]
 
-let%shared creet_base_radius = 15
+let%shared creet_base_radius = 20
 let%shared r_growing_speed = 0.1
 let%shared river_height = 50
 let%shared hospital_height = 50
@@ -32,14 +32,15 @@ let%shared mean_color = "violet"
 let%shared berserk_color = "orange"
 let%shared infected_color = "green"
 let%shared healthy_color = "gray"
-let%shared game_acceleration = 0.001
+let%shared game_acceleration = 0.0005
 let%shared direction_change_probability = 0.005
 let%shared creet_duplication_chance = 0.0001
 let%shared number_of_creet_at_start = 5
 let%shared time_to_die : float = 15.0
-let%shared shrink_speed = 0.005
+let%shared shrink_speed = 0.01
 let%shared mean_reduce_factor = 0.5
-let%shared death_random_factor = 0.05
+let%shared mean_speed_acceleration = 0.0005
+let%shared death_random_factor = 0.01
 
 let%server game_area =
   div
@@ -179,7 +180,10 @@ let%client handle_infected_creet game_state creet =
           let dx = target.x -. creet.x in
           let dy = target.y -. creet.y in
           let dist = sqrt ((dx *. dx) +. (dy *. dy)) +. 0.0001 in
-          let speed = 1.5 in
+          let base_speed =
+            sqrt ((creet.dx *. creet.dx) +. (creet.dy *. creet.dy))
+          in
+          let speed = base_speed +. mean_speed_acceleration in
           creet.dx <- dx /. dist *. speed;
           creet.dy <- dy /. dist *. speed
       | None -> ())

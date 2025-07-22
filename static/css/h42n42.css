@@ -17,3 +17,28 @@ body {
   border-radius: 50%;
   z-index: 10;
 }
+
+.soot-sprite {
+  transition: border 0.2s, box-shadow 0.2s, width 0.2s, height 0.2s;
+  box-shadow: 0 0 12px 4px #111;
+  border-radius: 50%;
+  background: black;
+  position: absolute;
+  display: block;
+}
+
+.soot-eye {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 0 4px 1px #222;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.soot-pupil {
+  position: absolute;
+  background: #111;
+  border-radius: 50%;
+  z-index: 3;
+}

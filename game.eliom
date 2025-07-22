@@ -19,7 +19,11 @@ type creet =
   ; mutable infected_time : float
   ; mutable move_listener : Dom_html.event_listener_id option
   ; mutable up_listener : Dom_html.event_listener_id option
-  ; dom : Dom_html.divElement Js.t }
+  ; mutable dom : Dom_html.divElement Js.t
+  ; mutable eye_1 : Dom_html.divElement Js.t
+  ; mutable eye_2 : Dom_html.divElement Js.t
+  ; mutable pupil_1 : Dom_html.divElement Js.t
+  ; mutable pupil_2 : Dom_html.divElement Js.t }
 
 type game_state =
   {mutable creets : creet list; mutable is_running : bool; mutable timer : float}]
@@ -240,18 +244,55 @@ let%client create_creet id x y infected =
   let playground = Dom_html.getElementById "game_area" in
   let creet = Dom_html.createDiv Dom_html.document in
   creet##.id := Js.string id;
-  creet##.className := Js.string "creet";
+  creet##.className := Js.string "soot-sprite";
   creet##.style##.position := Js.string "absolute";
   creet##.style##.left := Js.string (Printf.sprintf "%dpx" x);
   creet##.style##.top := Js.string (Printf.sprintf "%dpx" y);
-  creet##.style##.width
-  := Js.string (string_of_int (creet_base_radius * 2) ^ "px");
-  creet##.style##.height
-  := Js.string (string_of_int (creet_base_radius * 2) ^ "px");
-  creet##.style##.backgroundColor
-  := Js.string (if infected then infected_color else healthy_color);
+  let px = string_of_int (creet_base_radius * 2) ^ "px" in
+  creet##.style##.width := Js.string px;
+  creet##.style##.height := Js.string px;
+  creet##.style##.borderRadius := Js.string "50%";
+  creet##.style##.background := Js.string "black";
+  (Js.Unsafe.coerce creet##.style)##.boxShadow := Js.string "0 0 12px 4px #111";
+  (* Couleur de bordure selon l'état *)
+  let border_color = if infected then infected_color else healthy_color in
+  creet##.style##.border := Js.string ("3px solid " ^ border_color);
+  (* YEUX : deux sous-divs *)
+  let mk_eye left top pupil_left pupil_top =
+    let eye = Dom_html.createDiv Dom_html.document in
+    eye##.className := Js.string "soot-eye";
+    let eye_px =
+      string_of_int (int_of_float (float creet_base_radius *. 1.1)) ^ "px"
+    in
+    eye##.style##.position := Js.string "absolute";
+    eye##.style##.width := Js.string eye_px;
+    eye##.style##.height := Js.string eye_px;
+    eye##.style##.left := Js.string left;
+    eye##.style##.top := Js.string top;
+    eye##.style##.background := Js.string "white";
+    eye##.style##.borderRadius := Js.string "50%";
+    (Js.Unsafe.coerce creet##.style)##.boxShadow := Js.string "0 0 4px 1px #222";
+    let pupil = Dom_html.createDiv Dom_html.document in
+    pupil##.className := Js.string "soot-pupil";
+    let pupil_px =
+      string_of_int (int_of_float (float creet_base_radius *. 0.5)) ^ "px"
+    in
+    pupil##.style##.position := Js.string "absolute";
+    pupil##.style##.width := Js.string pupil_px;
+    pupil##.style##.height := Js.string pupil_px;
+    pupil##.style##.left := Js.string pupil_left;
+    pupil##.style##.top := Js.string pupil_top;
+    pupil##.style##.background := Js.string "#111";
+    pupil##.style##.borderRadius := Js.string "50%";
+    Dom.appendChild eye pupil;
+    eye, pupil
+  in
+  let eye_1, pupil_1 = mk_eye "4px" "7px" "7px" "7px" in
+  let eye_2, pupil_2 = mk_eye "16px" "6px" "7px" "7px" in
+  Dom.appendChild creet eye_1;
+  Dom.appendChild creet eye_2;
   Dom.appendChild playground creet;
-  creet
+  creet, eye_1, eye_2, pupil_1, pupil_2
 
 let%client show_game_over () =
   Js_of_ocaml.Firebug.console##log (Js.string "💀 show_game_over called!");
@@ -354,7 +395,9 @@ and maybe_duplicate_creet game_state creet =
     let y = creet.y +. float_of_int (Random.int 30 - 15) in
     let dx = (2.0 *. Random.float 1.0) -. 1.0 in
     let dy = (2.0 *. Random.float 1.0) -. 1.0 in
-    let dom = create_creet id (int_of_float x) (int_of_float y) false in
+    let dom, eye_1, eye_2, pupil_1, pupil_2 =
+      create_creet id (int_of_float x) (int_of_float y) false
+    in
     let new_creet =
       { id
       ; x
@@ -368,7 +411,11 @@ and maybe_duplicate_creet game_state creet =
       ; infected_time = 0.0
       ; move_listener = None
       ; up_listener = None
-      ; dom }
+      ; dom
+      ; eye_1
+      ; eye_2
+      ; pupil_1
+      ; pupil_2 }
     in
     enable_drag new_creet;
     Lwt.async (fun () -> creet_loop game_state new_creet);
@@ -396,7 +443,10 @@ let%client init_client () =
     let dx = (2.0 *. Random.float 1.0) -. 1.0 in
     let dy = (2.0 *. Random.float 1.0) -. 1.0 in
     let infected = false in
-    let dom = create_creet ("creet" ^ string_of_int i) x y infected in
+    (* On récupère toutes les références *)
+    let dom, eye_1, eye_2, pupil_1, pupil_2 =
+      create_creet ("creet" ^ string_of_int i) x y infected
+    in
     let c =
       { id = "creet" ^ string_of_int i
       ; x = float_of_int x
@@ -410,7 +460,11 @@ let%client init_client () =
       ; infected_time = 0.0
       ; move_listener = None
       ; up_listener = None
-      ; dom }
+      ; dom
+      ; eye_1
+      ; eye_2
+      ; pupil_1
+      ; pupil_2 }
     in
     enable_drag c;
     creets := c :: !creets

@@ -39,9 +39,9 @@ let%shared direction_change_probability = 0.005
 let%shared creet_duplication_chance = 0.0001
 let%shared number_of_creet_at_start = 5
 let%shared time_to_die : float = 15.0
-let%shared shrink_speed = 0.01
-let%shared mean_reduce_factor = 0.5
+let%shared mean_reduce_factor = 0.85
 let%shared mean_speed_acceleration = 0.0005
+let%shared shrink_speed = 0.01
 let%shared death_random_factor = 0.01
 
 let%server game_area =
@@ -101,6 +101,21 @@ let%client infect_creet game_state creet =
   in
   creet.state <- new_state;
   creet.infected_time <- game_state.timer;
+  (match new_state with
+  | Infected ->
+      creet.dx <- creet.dx *. 0.85;
+      creet.dy <- creet.dy *. 0.85
+  | Mean ->
+      creet.dx <- creet.dx *. 0.85;
+      creet.dy <- creet.dy *. 0.85;
+      creet.r_size <- float_of_int creet_base_radius *. mean_reduce_factor;
+      let px = string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px" in
+      creet.dom##.style##.width := Js.string px;
+      creet.dom##.style##.height := Js.string px
+  | Berserk ->
+      creet.dx <- creet.dx *. 0.85;
+      creet.dy <- creet.dy *. 0.85
+  | Healthy -> ());
   creet.dom##.style##.backgroundColor
   := Js.string
        (match new_state with
@@ -166,7 +181,6 @@ let%client handle_infected_creet game_state creet =
   | Mean -> (
       if creet.r_size > float_of_int creet_base_radius *. mean_reduce_factor
       then (
-        creet.r_size <- creet.r_size -. shrink_speed;
         creet.dom##.style##.width
         := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px");
         creet.dom##.style##.height
@@ -358,11 +372,11 @@ let%client rec game_loop (game_state : game_state) =
              := Js.string (Printf.sprintf "%fpx" creet.x);
              creet.dom##.style##.top
              := Js.string (Printf.sprintf "%fpx" creet.y);
-             propagate_infection game_state creet;
              maybe_duplicate_creet game_state creet;
              handle_infected_creet game_state creet;
              return_to_normal_size creet);
-           check_alive game_state creet)
+           check_alive game_state creet;
+           propagate_infection game_state creet)
         game_state.creets
     in
     game_state.timer <- game_state.timer +. 0.02;

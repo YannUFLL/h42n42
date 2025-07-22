@@ -16,6 +16,8 @@ type creet =
   ; mutable available : bool
   ; mutable r_size : float
   ; mutable infected_time : float
+  ; mutable move_listener : Dom_html.event_listener_id option
+  ; mutable up_listener : Dom_html.event_listener_id option
   ; dom : Dom_html.divElement Js.t }
 
 type game_state =
@@ -196,6 +198,10 @@ let%client random_rotation creet =
     creet.dy <- sin angle *. speed)
 
 let%client remove_creet game_state creet =
+  Option.iter Dom_html.removeEventListener creet.move_listener;
+  Option.iter Dom_html.removeEventListener creet.up_listener;
+  creet.move_listener <- None;
+  creet.up_listener <- None;
   (match Js.Opt.to_option creet.dom##.parentNode with
   | Some parent -> Dom.removeChild parent creet.dom
   | None -> ());
@@ -257,8 +263,6 @@ let%client enable_drag creet =
   let game_right = float_of_int game_area_width -. (creet.r_size *. 2.) in
   let game_bottom = float_of_int game_area_height -. (creet.r_size *. 2.) in
   let hospital_start = float_of_int (game_area_height - hospital_height) in
-  let move_id = ref None in
-  let up_id = ref None in
   let on_move ev =
     let x_raw = float_of_int ev##.clientX -. creet.r_size in
     let y_raw = float_of_int ev##.clientY -. creet.r_size in
@@ -276,19 +280,19 @@ let%client enable_drag creet =
       creet.state <- Healthy;
       creet.dom##.style##.backgroundColor := Js.string healthy_color);
     creet.available <- true;
-    Option.iter Dom_html.removeEventListener !move_id;
-    Option.iter Dom_html.removeEventListener !up_id;
-    move_id := None;
-    up_id := None;
+    Option.iter Dom_html.removeEventListener creet.move_listener;
+    Option.iter Dom_html.removeEventListener creet.up_listener;
+    creet.move_listener <- None;
+    creet.up_listener <- None;
     Js._false
   in
   let on_down _ev =
     creet.available <- false;
-    move_id :=
+    creet.move_listener <-
       Some
         (Dom_html.addEventListener doc Dom_html.Event.mousemove
            (Dom_html.handler on_move) Js._false);
-    up_id :=
+    creet.up_listener <-
       Some
         (Dom_html.addEventListener doc Dom_html.Event.mouseup
            (Dom_html.handler on_up) Js._false);
@@ -317,6 +321,8 @@ let%client maybe_duplicate_creet game_state creet =
       ; available = true
       ; r_size = float_of_int creet_base_radius
       ; infected_time = 0.0
+      ; move_listener = None
+      ; up_listener = None
       ; dom }
     in
     enable_drag new_creet;
@@ -348,7 +354,6 @@ let%client rec game_loop (game_state : game_state) =
              creet.y <- creet.y +. creet.dy;
              check_border_collision creet;
              check_river game_state creet;
-             check_alive game_state creet;
              creet.dom##.style##.left
              := Js.string (Printf.sprintf "%fpx" creet.x);
              creet.dom##.style##.top
@@ -356,7 +361,8 @@ let%client rec game_loop (game_state : game_state) =
              propagate_infection game_state creet;
              maybe_duplicate_creet game_state creet;
              handle_infected_creet game_state creet;
-             return_to_normal_size creet))
+             return_to_normal_size creet);
+           check_alive game_state creet)
         game_state.creets
     in
     game_state.timer <- game_state.timer +. 0.02;
@@ -382,6 +388,8 @@ let%client init_client () =
       ; available = true
       ; r_size = float_of_int creet_base_radius
       ; infected_time = 0.0
+      ; move_listener = None
+      ; up_listener = None
       ; dom }
     in
     enable_drag c;

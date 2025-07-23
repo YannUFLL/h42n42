@@ -53,6 +53,7 @@ body {
 
 .cell-sprite .cell-eye {
   background: rgb(255, 255, 255);
+  z-index: 10;
 }
 .cell-sprite.healthy {
   background: var(--healthy-bg);
@@ -197,6 +198,35 @@ body {
   background: rgba(236, 11, 11, 0.2);
 }
 
+.phage {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: url('/images/phage.svg') no-repeat center/contain;
+  opacity: 0;
+  z-index: 0;
 
+  animation:
+    phage-grow 1s ease-out forwards,
+    phage-spin 2s linear infinite 1s;
+}
 
+@keyframes phage-grow {
+  from {
+    transform: scale(0.2) rotate(0deg);
+    opacity: 0.2;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.8;
+  }
+}
 
+@keyframes phage-spin {
+  from {
+    transform: scale(1) rotate(0deg);
+  }
+  to {
+    transform: scale(1) rotate(360deg);
+  }
+}

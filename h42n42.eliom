@@ -2,13 +2,9 @@
    and redistribute it as you wish. *)
 
 let%server application_name = "h42n42"
-let%client application_name =  Eliom_client.get_application_name ()
-
-
-
+let%client application_name = Eliom_client.get_application_name ()
 
 let%server () =
-
   Ocsipersist_settings.set_db_file "local/var/data/h42n42/h42n42_db"
 
 (* Create a module for the application. See
@@ -28,20 +24,22 @@ let%server main_service =
   Eliom_service.create ~path:(Eliom_service.Path [])
     ~meth:(Eliom_service.Get Eliom_parameter.unit) ()
 
-    let%client () = print_endline "Hello"
+let%client () = print_endline "Hello"
 
 let%server main_page () =
   Eliom_content.Html.F.(
     html
-      (head (title (txt "h42n42"))
-        [ css_link ~uri:(make_uri ~service:(Eliom_service.static_dir ()) ["css"; "h42n42.css"]) () ])
-      (body  [Game.game_area]))
+      (head
+         (title (txt "h42n42"))
+         [ css_link
+             ~uri:
+               (make_uri
+                  ~service:(Eliom_service.static_dir ())
+                  ["css"; "h42n42.css"])
+             () ])
+      (body [Game.game_area]))
 
-
-    
 let%server () =
   App.register ~service:main_service (fun () () ->
     let _ = [%client (Game.init_client () : unit)] in
     Lwt.return (main_page ()))
-
-

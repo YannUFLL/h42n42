@@ -1,0 +1,20 @@
+<svg viewBox="0 0 120 140" width="120" height="140" xmlns="http://www.w3.org/2000/svg">
+  <!-- Tête hexagonale -->
+  <polygon points="60,12 90,30 90,54 60,72 30,54 30,30" fill="#93e9fc" stroke="#111" stroke-width="4"></polygon>
+  <polygon points="60,12 90,30 60,48 30,30" fill="#d2f8ff" stroke="#111" stroke-width="2"></polygon>
+  <!-- Cou (anneau haut) -->
+  <ellipse cx="60" cy="74" rx="13" ry="6" fill="#fff" stroke="#111" stroke-width="4"></ellipse>
+  <!-- Corps (colonne segmentée) -->
+  <rect x="48" y="78" width="24" height="32" rx="10" fill="#d8f6ff" stroke="#111" stroke-width="4"></rect>
+  <ellipse cx="60" cy="85" rx="11" ry="5" fill="#9aeaff" stroke="#111" stroke-width="3"></ellipse>
+  <ellipse cx="60" cy="95" rx="11" ry="5" fill="#d8f6ff" stroke="#111" stroke-width="3"></ellipse>
+  <ellipse cx="60" cy="105" rx="11" ry="5" fill="#9aeaff" stroke="#111" stroke-width="3"></ellipse>
+  <!-- Base (anneau bas) -->
+  <ellipse cx="60" cy="113" rx="14" ry="7" fill="#93e9fc" stroke="#111" stroke-width="4"></ellipse>
+  <!-- Pattes gauches -->
+  <polyline points="60,113 32,92 20,125" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round"></polyline>
+  <polyline points="60,113 38,107 27,137" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round"></polyline>
+  <!-- Pattes droites -->
+  <polyline points="60,113 88,92 100,125" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round"></polyline>
+  <polyline points="60,113 82,107 93,137" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round"></polyline>
+</svg>

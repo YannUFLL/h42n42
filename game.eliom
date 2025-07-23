@@ -23,7 +23,8 @@ type creet =
   ; mutable eye_1 : Dom_html.divElement Js.t
   ; mutable eye_2 : Dom_html.divElement Js.t
   ; mutable pupil_1 : Dom_html.divElement Js.t
-  ; mutable pupil_2 : Dom_html.divElement Js.t }
+  ; mutable pupil_2 : Dom_html.divElement Js.t
+  ; mutable phage_list : Dom_html.divElement Js.t list }
 
 type game_state =
   {mutable creets : creet list; mutable is_running : bool; mutable timer : float}]
@@ -95,8 +96,39 @@ let%client check_collision c1 c2 =
   let dist2 = sqrt ((dx *. dx) +. (dy *. dy)) in
   dist2 < c1.r_size +. c2.r_size
 
+let%client set_scatter_vars (elt : #Dom_html.element Js.t) : unit =
+  let angle = Random.float 360. in
+  let dist = 50. +. Random.float 100. in
+  let dx = cos (angle *. Float.pi /. 180.) *. dist in
+  let dy = sin (angle *. Float.pi /. 180.) *. dist in
+  ignore
+    (elt##.style##setProperty
+       (Js.string "--dx")
+       (Js.string (Printf.sprintf "%.1fpx" dx))
+       Js.undefined);
+  ignore
+    (elt##.style##setProperty
+       (Js.string "--dy")
+       (Js.string (Printf.sprintf "%.1fpx" dy))
+       Js.undefined);
+  ignore
+    (elt##.style##setProperty
+       (Js.string "--rot")
+       (Js.string (Printf.sprintf "%.1fdeg" angle))
+       Js.undefined)
+
+let%client clear_phages creet =
+  List.iter
+    (fun ph ->
+       match Js.Opt.to_option ph##.parentNode with
+       | Some parent -> Dom.removeChild parent ph
+       | None -> ())
+    creet.phage_list;
+  creet.phage_list <- []
+
 let%client change_class_state new_state creet : unit =
   creet.state <- new_state;
+  if new_state = Healthy then clear_phages creet;
   let state_class =
     match new_state with
     | Healthy -> "healthy"
@@ -105,6 +137,22 @@ let%client change_class_state new_state creet : unit =
     | Mean -> "mean"
   in
   creet.dom##.className := Js.string ("cell-sprite " ^ state_class)
+
+let%client spawn_phage creet =
+  let ph = Dom_html.createDiv Dom_html.document in
+  ph##.className := Js.string "phage";
+  let creet_radius = creet.r_size in
+  let phage_size = 20. in
+  let center = creet_radius -. (phage_size /. 2.) in
+  let angle = Random.float (2. *. Float.pi) in
+  let dist = creet_radius *. 0.8 *. Random.float 1.0 in
+  let x = center +. (cos angle *. dist) in
+  let y = center +. (sin angle *. dist) in
+  ph##.style##.left := Js.string (Printf.sprintf "%fpx" x);
+  ph##.style##.top := Js.string (Printf.sprintf "%fpx" y);
+  Dom.appendChild creet.dom ph;
+  creet.phage_list <- ph :: creet.phage_list;
+  set_scatter_vars ph
 
 let%client infect_creet game_state creet =
   let n = Random.int 10 in
@@ -140,7 +188,7 @@ let%client propagate_infection game_state creet =
       (fun target ->
          if
            target != creet && target.state = Healthy && target.available
-           && (not taget.is_dead)
+           && (not target.is_dead)
            && check_collision creet target
            && Random.int 100 < 2
          then infect_creet game_state target)
@@ -187,8 +235,11 @@ let%client handle_infected_creet game_state creet =
         creet.dom##.style##.width
         := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px");
         creet.dom##.style##.height
-        := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px"))
+        := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px"));
+      if Random.float 1.0 < 0.03 then spawn_phage creet
   | Mean -> (
+      if creet.state = Infected && Random.float 1.0 < 0.005
+      then spawn_phage creet;
       if creet.r_size > float_of_int creet_base_radius *. mean_reduce_factor
       then (
         creet.dom##.style##.width
@@ -207,6 +258,9 @@ let%client handle_infected_creet game_state creet =
           creet.dx <- dx /. dist *. speed;
           creet.dy <- dy /. dist *. speed
       | None -> ())
+  | Infected ->
+      if creet.state = Infected && Random.float 1.0 < 0.005
+      then spawn_phage creet
   | _ -> ()
 
 let%client check_river game_state creet =
@@ -247,27 +301,6 @@ let%client rec generate_unique_id game_state =
   if List.exists (fun c -> c.id = id) game_state.creets
   then generate_unique_id game_state
   else id
-
-let%client set_scatter_vars (elt : #Dom_html.element Js.t) : unit =
-  let angle = Random.float 360. in
-  let dist = 50. +. Random.float 100. in
-  let dx = cos (angle *. Float.pi /. 180.) *. dist in
-  let dy = sin (angle *. Float.pi /. 180.) *. dist in
-  ignore
-    (elt##.style##setProperty
-       (Js.string "--dx")
-       (Js.string (Printf.sprintf "%.1fpx" dx))
-       Js.undefined);
-  ignore
-    (elt##.style##setProperty
-       (Js.string "--dy")
-       (Js.string (Printf.sprintf "%.1fpx" dy))
-       Js.undefined);
-  ignore
-    (elt##.style##setProperty
-       (Js.string "--rot")
-       (Js.string (Printf.sprintf "%.1fdeg" angle))
-       Js.undefined)
 
 let%client create_creet id x y creet_state =
   let playground = Dom_html.getElementById "game_area" in
@@ -478,7 +511,8 @@ and maybe_duplicate_creet game_state creet =
       ; eye_1
       ; eye_2
       ; pupil_1
-      ; pupil_2 }
+      ; pupil_2
+      ; phage_list = [] }
     in
     enable_drag new_creet;
     Lwt.async (fun () -> creet_loop game_state new_creet);
@@ -530,7 +564,8 @@ let%client init_client () =
       ; eye_1
       ; eye_2
       ; pupil_1
-      ; pupil_2 }
+      ; pupil_2
+      ; phage_list = [] }
     in
     enable_drag c;
     creets := c :: !creets

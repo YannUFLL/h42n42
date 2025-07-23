@@ -43,7 +43,7 @@ let%shared game_acceleration = 0.0005
 let%shared direction_change_probability = 0.005
 let%shared creet_duplication_chance = 0.0001
 let%shared number_of_creet_at_start = 5
-let%shared time_to_die : float = 2.0
+let%shared time_to_die : float = 12.0
 let%shared mean_reduce_factor = 0.85
 let%shared mean_speed_acceleration = 0.0005
 let%shared shrink_speed = 0.01
@@ -140,6 +140,7 @@ let%client propagate_infection game_state creet =
       (fun target ->
          if
            target != creet && target.state = Healthy && target.available
+           && (not taget.is_dead)
            && check_collision creet target
            && Random.int 100 < 2
          then infect_creet game_state target)
@@ -398,13 +399,19 @@ let%client enable_drag creet =
     (Dom_html.addEventListener creet.dom Dom_html.Event.mousedown
        (Dom_html.handler on_down) Js._false)
 
-let%client update_pupil_position dx dy (pupil1, pupil2) =
+let%client update_pupil_position dx dy (pupil1, pupil2) creet =
   let open Js in
-  let max_offset_percent = 30.0 in
+  let base_amp = 30.0 in
+  let amp =
+    match creet.state with
+    | Mean -> base_amp *. 0.5
+    | Berserk -> 0.
+    | _ -> base_amp
+  in
   let mag = sqrt ((dx *. dx) +. (dy *. dy)) in
   let norm_dx, norm_dy = if mag = 0. then 0., 0. else dx /. mag, dy /. mag in
-  let percent_x = 50. +. (norm_dx *. max_offset_percent) in
-  let percent_y = 50. +. (norm_dy *. max_offset_percent) in
+  let percent_x = 50. +. (norm_dx *. amp) in
+  let percent_y = 50. +. (norm_dy *. amp) in
   let left_str = Printf.sprintf "%.1f%%" percent_x in
   let top_str = Printf.sprintf "%.1f%%" percent_y in
   pupil1##.style##.left := string left_str;
@@ -433,7 +440,9 @@ let%client rec creet_loop (game_state : game_state) creet =
       check_river game_state creet;
       creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" creet.x);
       creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" creet.y);
-      update_pupil_position creet.dx creet.dy (creet.pupil_1, creet.pupil_2);
+      update_pupil_position creet.dx creet.dy
+        (creet.pupil_1, creet.pupil_2)
+        creet;
       maybe_duplicate_creet game_state creet;
       handle_infected_creet game_state creet;
       return_to_normal_size creet);

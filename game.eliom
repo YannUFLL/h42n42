@@ -502,7 +502,11 @@ let%client init_client () =
   let creets = ref [] in
   for i = 0 to number_of_creet_at_start - 1 do
     let x = Random.int game_area_width - (creet_base_radius * 2) in
-    let y = Random.int game_area_height - (creet_base_radius * 2) in
+    let y =
+      Random.int
+        (game_area_height - (river_height * 4) - (creet_base_radius * 2))
+      + river_height
+    in
     let dx = (2.0 *. Random.float 1.0) -. 1.0 in
     let dy = (2.0 *. Random.float 1.0) -. 1.0 in
     let infected = false in

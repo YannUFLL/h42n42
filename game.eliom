@@ -126,9 +126,16 @@ let%client clear_phages creet =
     creet.phage_list;
   creet.phage_list <- []
 
+let%client reset_eye eye =
+  eye##.style##.transform := Js.string "none";
+  eye##.style##.width := Js.string "40%";
+  eye##.style##.height := Js.string "40%";
+  eye##.style##.background := Js.string "white"
+
 let%client change_class_state new_state creet : unit =
   creet.state <- new_state;
-  if new_state = Healthy then clear_phages creet;
+  if new_state = Healthy
+  then (clear_phages creet; reset_eye creet.eye_1; reset_eye creet.eye_2);
   let state_class =
     match new_state with
     | Healthy -> "healthy"
@@ -154,6 +161,27 @@ let%client spawn_phage creet =
   creet.phage_list <- ph :: creet.phage_list;
   set_scatter_vars ph
 
+let%client random_eye_deform eye =
+  let should_move = Random.float 1.0 < 0.75 in
+  let should_resize = Random.float 1.0 < 0.5 in
+  if should_move
+  then
+    let dx = Random.float 32. -. 16. in
+    let dy = Random.float 32. -. 16. in
+    eye##.style##.transform
+    := Js.string (Printf.sprintf "translate(%g%%,%g%%)" dx dy)
+  else eye##.style##.transform := Js.string "none";
+  if should_resize
+  then (
+    let base = 40. in
+    let size = base +. (Random.float 40. -. 20.) in
+    eye##.style##.width := Js.string (Printf.sprintf "%g%%" size);
+    eye##.style##.height := Js.string (Printf.sprintf "%g%%" size))
+  else (
+    eye##.style##.width := Js.string "40%";
+    eye##.style##.height := Js.string "40%");
+  ()
+
 let%client infect_creet game_state creet =
   let n = Random.int 10 in
   let new_state =
@@ -167,6 +195,8 @@ let%client infect_creet game_state creet =
   creet.infected_time <- game_state.timer;
   match new_state with
   | Infected ->
+      random_eye_deform creet.eye_1;
+      random_eye_deform creet.eye_2;
       creet.dx <- creet.dx *. 0.85;
       creet.dy <- creet.dy *. 0.85
   | Mean ->
@@ -175,8 +205,12 @@ let%client infect_creet game_state creet =
       creet.r_size <- float_of_int creet_base_radius *. mean_reduce_factor;
       let px = string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px" in
       creet.dom##.style##.width := Js.string px;
-      creet.dom##.style##.height := Js.string px
+      creet.dom##.style##.height := Js.string px;
+      random_eye_deform creet.eye_1;
+      random_eye_deform creet.eye_2
   | Berserk ->
+      random_eye_deform creet.eye_1;
+      random_eye_deform creet.eye_2;
       creet.dx <- creet.dx *. 0.85;
       creet.dy <- creet.dy *. 0.85
   | Healthy -> ()
@@ -236,9 +270,9 @@ let%client handle_infected_creet game_state creet =
         := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px");
         creet.dom##.style##.height
         := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px"));
-      if Random.float 1.0 < 0.03 then spawn_phage creet
+      if Random.float 1.0 < 0.0 then spawn_phage creet
   | Mean -> (
-      if creet.state = Infected && Random.float 1.0 < 0.005
+      if creet.state = Infected && Random.float 1.0 < 0.000
       then spawn_phage creet;
       if creet.r_size > float_of_int creet_base_radius *. mean_reduce_factor
       then (
@@ -259,7 +293,7 @@ let%client handle_infected_creet game_state creet =
           creet.dy <- dy /. dist *. speed
       | None -> ())
   | Infected ->
-      if creet.state = Infected && Random.float 1.0 < 0.005
+      if creet.state = Infected && Random.float 1.0 < 0.000
       then spawn_phage creet
   | _ -> ()
 

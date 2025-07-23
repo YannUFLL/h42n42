@@ -230,3 +230,10 @@ body {
     transform: scale(1) rotate(360deg);
   }
 }
+
+.cell-eye {
+  transition:
+    transform 10s linear,
+    width 9s linear,
+    height 9s linear;
+}

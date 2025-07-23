@@ -43,7 +43,7 @@ let%shared game_acceleration = 0.0005
 let%shared direction_change_probability = 0.005
 let%shared creet_duplication_chance = 0.0001
 let%shared number_of_creet_at_start = 5
-let%shared time_to_die : float = 15.0
+let%shared time_to_die : float = 2.0
 let%shared mean_reduce_factor = 0.85
 let%shared mean_speed_acceleration = 0.0005
 let%shared shrink_speed = 0.01
@@ -221,29 +221,7 @@ let%client random_rotation creet =
     creet.dy <- sin angle *. speed)
 
 let%client remove_creet game_state creet =
-  Option.iter Dom_html.removeEventListener creet.move_listener;
-  Option.iter Dom_html.removeEventListener creet.up_listener;
-  creet.move_listener <- None;
-  creet.up_listener <- None;
   creet.is_dead <- true;
-  for _ = 1 to 8 do
-    let s = Dom_html.createDiv Dom_html.document in
-    s##.className := Js.string "shard";
-    s##.style##.left := Js.string "50%";
-    s##.style##.top := Js.string "50%";
-    let style = s##.style in
-    let dx = Random.float 2. -. 1. in
-    let dy = Random.float 2. -. 1. in
-    ignore
-      (style##setProperty (Js.string "--dx")
-         (Js.string (string_of_float dx))
-         Js.undefined);
-    ignore
-      (style##setProperty (Js.string "--dy")
-         (Js.string (string_of_float dy))
-         Js.undefined);
-    Dom.appendChild creet.dom s
-  done;
   creet.dom##.classList##add (Js.string "explode");
   let on_end _ev =
     (match Js.Opt.to_option creet.dom##.parentNode with
@@ -269,6 +247,27 @@ let%client rec generate_unique_id game_state =
   then generate_unique_id game_state
   else id
 
+let%client set_scatter_vars (elt : #Dom_html.element Js.t) : unit =
+  let angle = Random.float 360. in
+  let dist = 50. +. Random.float 100. in
+  let dx = cos (angle *. Float.pi /. 180.) *. dist in
+  let dy = sin (angle *. Float.pi /. 180.) *. dist in
+  ignore
+    (elt##.style##setProperty
+       (Js.string "--dx")
+       (Js.string (Printf.sprintf "%.1fpx" dx))
+       Js.undefined);
+  ignore
+    (elt##.style##setProperty
+       (Js.string "--dy")
+       (Js.string (Printf.sprintf "%.1fpx" dy))
+       Js.undefined);
+  ignore
+    (elt##.style##setProperty
+       (Js.string "--rot")
+       (Js.string (Printf.sprintf "%.1fdeg" angle))
+       Js.undefined)
+
 let%client create_creet id x y creet_state =
   let playground = Dom_html.getElementById "game_area" in
   let creet = Dom_html.createDiv Dom_html.document in
@@ -287,16 +286,11 @@ let%client create_creet id x y creet_state =
   let px = string_of_int (creet_base_radius * 2) ^ "px" in
   creet##.style##.width := Js.string px;
   creet##.style##.height := Js.string px;
-  creet##.style##.borderRadius := Js.string "50%";
-  let border_color =
-    match creet_state with Healthy -> healthy_color | _ -> infected_color
-  in
-  creet##.style##.border := Js.string ("3px solid " ^ border_color);
+  set_scatter_vars creet;
   let mk_eye eye_class =
     let eye = Dom_html.createDiv Dom_html.document in
     eye##.className := Js.string ("cell-eye " ^ eye_class);
     eye##.style##.position := Js.string "absolute";
-    eye##.style##.background := Js.string "white";
     eye##.style##.borderRadius := Js.string "50%";
     (Js.Unsafe.coerce eye##.style)##.boxShadow := Js.string "0 0 4px 1px #222";
     let pupil = Dom_html.createDiv Dom_html.document in
@@ -311,7 +305,22 @@ let%client create_creet id x y creet_state =
   let eye_2, pupil_2 = mk_eye "cell-eye-right" in
   Dom.appendChild creet eye_1;
   Dom.appendChild creet eye_2;
+  set_scatter_vars eye_1;
+  set_scatter_vars eye_2;
+  set_scatter_vars pupil_1;
+  set_scatter_vars pupil_2;
   Dom.appendChild playground creet;
+  let core = Dom_html.createDiv Dom_html.document in
+  core##.className := Js.string "cell-core";
+  let left_p = 20. +. Random.float 20. in
+  let top_p = 40. +. Random.float 20. in
+  let size_p = 20. +. Random.float 30. in
+  core##.style##.left := Js.string (Printf.sprintf "%.1f%%" left_p);
+  core##.style##.top := Js.string (Printf.sprintf "%.1f%%" top_p);
+  core##.style##.width := Js.string (Printf.sprintf "%.1f%%" size_p);
+  core##.style##.height := Js.string (Printf.sprintf "%.1f%%" size_p);
+  Dom.appendChild creet core;
+  set_scatter_vars core;
   for _ = 1 to 5 do
     let g = Dom_html.createDiv Dom_html.document in
     g##.className := Js.string "granule";
@@ -321,7 +330,8 @@ let%client create_creet id x y creet_state =
     g##.style##.top := Js.string (Printf.sprintf "%.1f%%" py);
     let delay = Random.float 2.0 in
     g##.style##.animationDelay := Js.string (Printf.sprintf "%.2fs" delay);
-    Dom.appendChild creet g
+    Dom.appendChild creet g;
+    set_scatter_vars g
   done;
   creet, eye_1, eye_2, pupil_1, pupil_2
 
@@ -394,7 +404,7 @@ let%client update_pupil_position dx dy (pupil1, pupil2) =
   let mag = sqrt ((dx *. dx) +. (dy *. dy)) in
   let norm_dx, norm_dy = if mag = 0. then 0., 0. else dx /. mag, dy /. mag in
   let percent_x = 50. +. (norm_dx *. max_offset_percent) in
-  let percent_y = 50. -. (norm_dy *. max_offset_percent) in
+  let percent_y = 50. +. (norm_dy *. max_offset_percent) in
   let left_str = Printf.sprintf "%.1f%%" percent_x in
   let top_str = Printf.sprintf "%.1f%%" percent_y in
   pupil1##.style##.left := string left_str;
@@ -407,7 +417,7 @@ let%client rec creet_loop (game_state : game_state) creet =
   if not game_state.is_running
   then Lwt.return_unit
   else (
-    if creet.available
+    if creet.available && not creet.is_dead
     then (
       let speed = sqrt ((creet.dx *. creet.dx) +. (creet.dy *. creet.dy)) in
       let new_speed = speed +. game_acceleration in

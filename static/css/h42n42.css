@@ -76,6 +76,7 @@ body {
 .cell-sprite {
   position: relative;
   display: block;
+  overflow: visible;
   border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
   animation: blob-intense 4s infinite ease-in-out;
   background: radial-gradient(
@@ -84,14 +85,30 @@ body {
     rgba(106, 207, 193, 0.7) 50%,
     rgba(61, 167, 151, 0.6) 100%
   );
-      box-shadow:
-    inset 0 2px 6px rgba(0,0,0,0.2),
-    inset 0 -2px 6px rgba(255,255,255,0.3),
-    0 0 4px rgba(0, 150, 120, 0.6);
-    
 
 }
 
+@keyframes explode {
+  0% {
+    opacity: 1;
+    transform: scale(1)      translateZ(0);
+    filter: blur(0px);
+  }
+  70% {
+    opacity: 0.7;
+    transform: scale(2)      translateZ(0);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3)      translateZ(0);
+    filter: blur(4px);
+  }
+}
+
+.cell-sprite.explode {
+  animation: explode 1.6s forwards ease-out;
+}
 
 @keyframes blob-intense {
   0%, 100% {
@@ -137,11 +154,34 @@ body {
 
 .cell-pupil {
   position: absolute;
-  width:  50%;   /* 50% de la width de .cell-eye */
-  height: 50%;   /* 50% de la height de .cell-eye */
-  left:   50%;   /* positionne le coin haut-gauche sur le centre */
+  width:  50%;  
+  height: 50%;  
+  left:   50%;   
   top:    50%;
-  transform: translate(-50%, -50%); /* recule de 50% de sa propre taille pour centrer */
+  transform: translate(-50%, -50%); 
   background: #111;
   border-radius: 50%;
+}
+
+.shard {
+  position: absolute;
+  width: 4px; 
+  height: 4px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 50%;
+  /* animation: fly-away 0.6s forwards ease-out;   */
+}
+
+@keyframes fly-away {
+  from {
+    transform: translate(0,0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(
+      calc((50px - 25px) * var(--dx, 1)),
+      calc((50px - 25px) * var(--dy, 1))
+    ) scale(0.5);
+    opacity: 0;
+  }
 }

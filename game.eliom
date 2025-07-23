@@ -226,10 +226,35 @@ let%client remove_creet game_state creet =
   creet.move_listener <- None;
   creet.up_listener <- None;
   creet.is_dead <- true;
-  (match Js.Opt.to_option creet.dom##.parentNode with
-  | Some parent -> Dom.removeChild parent creet.dom
-  | None -> ());
-  game_state.creets <- List.filter (fun c -> c != creet) game_state.creets
+  for _ = 1 to 8 do
+    let s = Dom_html.createDiv Dom_html.document in
+    s##.className := Js.string "shard";
+    s##.style##.left := Js.string "50%";
+    s##.style##.top := Js.string "50%";
+    let style = s##.style in
+    let dx = Random.float 2. -. 1. in
+    let dy = Random.float 2. -. 1. in
+    ignore
+      (style##setProperty (Js.string "--dx")
+         (Js.string (string_of_float dx))
+         Js.undefined);
+    ignore
+      (style##setProperty (Js.string "--dy")
+         (Js.string (string_of_float dy))
+         Js.undefined);
+    Dom.appendChild creet.dom s
+  done;
+  creet.dom##.classList##add (Js.string "explode");
+  let on_end _ev =
+    (match Js.Opt.to_option creet.dom##.parentNode with
+    | Some parent -> Dom.removeChild parent creet.dom
+    | None -> ());
+    game_state.creets <- List.filter (fun c -> c != creet) game_state.creets;
+    Js._false
+  in
+  ignore
+    (Dom_html.addEventListener creet.dom Dom_html.Event.animationend
+       (Dom_html.handler on_end) Js._false)
 
 let%client check_alive game_state creet =
   if creet.state = Infected || creet.state = Berserk || creet.state = Mean
@@ -263,7 +288,6 @@ let%client create_creet id x y creet_state =
   creet##.style##.width := Js.string px;
   creet##.style##.height := Js.string px;
   creet##.style##.borderRadius := Js.string "50%";
-  (Js.Unsafe.coerce creet##.style)##.boxShadow := Js.string "0 0 12px 4px #111";
   let border_color =
     match creet_state with Healthy -> healthy_color | _ -> infected_color
   in
@@ -367,7 +391,6 @@ let%client enable_drag creet =
 let%client update_pupil_position dx dy (pupil1, pupil2) =
   let open Js in
   let max_offset_percent = 30.0 in
-  (* décalage max = 30% du centre *)
   let mag = sqrt ((dx *. dx) +. (dy *. dy)) in
   let norm_dx, norm_dy = if mag = 0. then 0., 0. else dx /. mag, dy /. mag in
   let percent_x = 50. +. (norm_dx *. max_offset_percent) in
@@ -464,7 +487,6 @@ let%client init_client () =
     let dx = (2.0 *. Random.float 1.0) -. 1.0 in
     let dy = (2.0 *. Random.float 1.0) -. 1.0 in
     let infected = false in
-    (* On récupère toutes les références *)
     let dom, eye_1, eye_2, pupil_1, pupil_2 =
       create_creet ("creet" ^ string_of_int i) x y Healthy
     in

@@ -54,7 +54,8 @@ $(addprefix $(TEST_PREFIX), $(DIST_DIRS)):
 	mkdir -p $@
 
 staticfiles:
-	cp -rf $(LOCAL_STATIC_CSS) $(TEST_PREFIX)$(ELIOMSTATICDIR)
+	cp -rf $(LOCAL_STATIC_CSS) $(LOCAL_STATIC_IMAGES) $(TEST_PREFIX)$(ELIOMSTATICDIR)
+	
 
 ##----------------------------------------------------------------------
 ## Installing & Running

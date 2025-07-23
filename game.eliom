@@ -95,6 +95,17 @@ let%client check_collision c1 c2 =
   let dist2 = sqrt ((dx *. dx) +. (dy *. dy)) in
   dist2 < c1.r_size +. c2.r_size
 
+let%client change_class_state new_state creet : unit =
+  creet.state <- new_state;
+  let state_class =
+    match new_state with
+    | Healthy -> "healthy"
+    | Infected -> "infected"
+    | Berserk -> "berserk"
+    | Mean -> "mean"
+  in
+  creet.dom##.className := Js.string ("cell-sprite " ^ state_class)
+
 let%client infect_creet game_state creet =
   let n = Random.int 10 in
   let new_state =
@@ -104,9 +115,9 @@ let%client infect_creet game_state creet =
     then Mean (* 1/10 *)
     else Infected (* 8/10 *)
   in
-  creet.state <- new_state;
+  change_class_state new_state creet;
   creet.infected_time <- game_state.timer;
-  (match new_state with
+  match new_state with
   | Infected ->
       creet.dx <- creet.dx *. 0.85;
       creet.dy <- creet.dy *. 0.85
@@ -120,14 +131,7 @@ let%client infect_creet game_state creet =
   | Berserk ->
       creet.dx <- creet.dx *. 0.85;
       creet.dy <- creet.dy *. 0.85
-  | Healthy -> ());
-  creet.dom##.style##.backgroundColor
-  := Js.string
-       (match new_state with
-       | Berserk -> berserk_color
-       | Mean -> mean_color
-       | Infected -> infected_color
-       | Healthy -> healthy_color)
+  | Healthy -> ()
 
 let%client propagate_infection game_state creet =
   if creet.state = Infected || creet.state = Berserk || creet.state = Mean
@@ -240,11 +244,18 @@ let%client rec generate_unique_id game_state =
   then generate_unique_id game_state
   else id
 
-let%client create_creet id x y infected =
+let%client create_creet id x y creet_state =
   let playground = Dom_html.getElementById "game_area" in
   let creet = Dom_html.createDiv Dom_html.document in
   creet##.id := Js.string id;
-  creet##.className := Js.string "soot-sprite";
+  let state_class =
+    match creet_state with
+    | Healthy -> "healthy"
+    | Infected -> "infected"
+    | Berserk -> "berserk"
+    | Mean -> "mean"
+  in
+  creet##.className := Js.string ("cell-sprite " ^ state_class);
   creet##.style##.position := Js.string "absolute";
   creet##.style##.left := Js.string (Printf.sprintf "%dpx" x);
   creet##.style##.top := Js.string (Printf.sprintf "%dpx" y);
@@ -252,46 +263,42 @@ let%client create_creet id x y infected =
   creet##.style##.width := Js.string px;
   creet##.style##.height := Js.string px;
   creet##.style##.borderRadius := Js.string "50%";
-  creet##.style##.background := Js.string "black";
   (Js.Unsafe.coerce creet##.style)##.boxShadow := Js.string "0 0 12px 4px #111";
-  (* Couleur de bordure selon l'état *)
-  let border_color = if infected then infected_color else healthy_color in
+  let border_color =
+    match creet_state with Healthy -> healthy_color | _ -> infected_color
+  in
   creet##.style##.border := Js.string ("3px solid " ^ border_color);
-  (* YEUX : deux sous-divs *)
-  let mk_eye left top pupil_left pupil_top =
+  let mk_eye eye_class =
     let eye = Dom_html.createDiv Dom_html.document in
-    eye##.className := Js.string "soot-eye";
-    let eye_px =
-      string_of_int (int_of_float (float creet_base_radius *. 1.1)) ^ "px"
-    in
+    eye##.className := Js.string ("cell-eye " ^ eye_class);
     eye##.style##.position := Js.string "absolute";
-    eye##.style##.width := Js.string eye_px;
-    eye##.style##.height := Js.string eye_px;
-    eye##.style##.left := Js.string left;
-    eye##.style##.top := Js.string top;
     eye##.style##.background := Js.string "white";
     eye##.style##.borderRadius := Js.string "50%";
-    (Js.Unsafe.coerce creet##.style)##.boxShadow := Js.string "0 0 4px 1px #222";
+    (Js.Unsafe.coerce eye##.style)##.boxShadow := Js.string "0 0 4px 1px #222";
     let pupil = Dom_html.createDiv Dom_html.document in
-    pupil##.className := Js.string "soot-pupil";
-    let pupil_px =
-      string_of_int (int_of_float (float creet_base_radius *. 0.5)) ^ "px"
-    in
+    pupil##.className := Js.string "cell-pupil";
     pupil##.style##.position := Js.string "absolute";
-    pupil##.style##.width := Js.string pupil_px;
-    pupil##.style##.height := Js.string pupil_px;
-    pupil##.style##.left := Js.string pupil_left;
-    pupil##.style##.top := Js.string pupil_top;
     pupil##.style##.background := Js.string "#111";
     pupil##.style##.borderRadius := Js.string "50%";
     Dom.appendChild eye pupil;
     eye, pupil
   in
-  let eye_1, pupil_1 = mk_eye "4px" "7px" "7px" "7px" in
-  let eye_2, pupil_2 = mk_eye "16px" "6px" "7px" "7px" in
+  let eye_1, pupil_1 = mk_eye "cell-eye-left" in
+  let eye_2, pupil_2 = mk_eye "cell-eye-right" in
   Dom.appendChild creet eye_1;
   Dom.appendChild creet eye_2;
   Dom.appendChild playground creet;
+  for _ = 1 to 5 do
+    let g = Dom_html.createDiv Dom_html.document in
+    g##.className := Js.string "granule";
+    let px = 20. +. Random.float 60. in
+    let py = 20. +. Random.float 60. in
+    g##.style##.left := Js.string (Printf.sprintf "%.1f%%" px);
+    g##.style##.top := Js.string (Printf.sprintf "%.1f%%" py);
+    let delay = Random.float 2.0 in
+    g##.style##.animationDelay := Js.string (Printf.sprintf "%.2fs" delay);
+    Dom.appendChild creet g
+  done;
   creet, eye_1, eye_2, pupil_1, pupil_2
 
 let%client show_game_over () =
@@ -333,9 +340,7 @@ let%client enable_drag creet =
   in
   let on_up _ev =
     if creet.y +. creet.r_size >= hospital_start
-    then (
-      creet.state <- Healthy;
-      creet.dom##.style##.backgroundColor := Js.string healthy_color);
+    then change_class_state Healthy creet;
     creet.available <- true;
     Option.iter Dom_html.removeEventListener creet.move_listener;
     Option.iter Dom_html.removeEventListener creet.up_listener;
@@ -359,6 +364,21 @@ let%client enable_drag creet =
     (Dom_html.addEventListener creet.dom Dom_html.Event.mousedown
        (Dom_html.handler on_down) Js._false)
 
+let%client update_pupil_position dx dy (pupil1, pupil2) =
+  let open Js in
+  let max_offset_percent = 30.0 in
+  (* décalage max = 30% du centre *)
+  let mag = sqrt ((dx *. dx) +. (dy *. dy)) in
+  let norm_dx, norm_dy = if mag = 0. then 0., 0. else dx /. mag, dy /. mag in
+  let percent_x = 50. +. (norm_dx *. max_offset_percent) in
+  let percent_y = 50. -. (norm_dy *. max_offset_percent) in
+  let left_str = Printf.sprintf "%.1f%%" percent_x in
+  let top_str = Printf.sprintf "%.1f%%" percent_y in
+  pupil1##.style##.left := string left_str;
+  pupil1##.style##.top := string top_str;
+  pupil2##.style##.left := string left_str;
+  pupil2##.style##.top := string top_str
+
 let%client rec creet_loop (game_state : game_state) creet =
   let open Lwt in
   if not game_state.is_running
@@ -380,6 +400,7 @@ let%client rec creet_loop (game_state : game_state) creet =
       check_river game_state creet;
       creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" creet.x);
       creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" creet.y);
+      update_pupil_position creet.dx creet.dy (creet.pupil_1, creet.pupil_2);
       maybe_duplicate_creet game_state creet;
       handle_infected_creet game_state creet;
       return_to_normal_size creet);
@@ -396,7 +417,7 @@ and maybe_duplicate_creet game_state creet =
     let dx = (2.0 *. Random.float 1.0) -. 1.0 in
     let dy = (2.0 *. Random.float 1.0) -. 1.0 in
     let dom, eye_1, eye_2, pupil_1, pupil_2 =
-      create_creet id (int_of_float x) (int_of_float y) false
+      create_creet id (int_of_float x) (int_of_float y) creet.state
     in
     let new_creet =
       { id
@@ -445,7 +466,7 @@ let%client init_client () =
     let infected = false in
     (* On récupère toutes les références *)
     let dom, eye_1, eye_2, pupil_1, pupil_2 =
-      create_creet ("creet" ^ string_of_int i) x y infected
+      create_creet ("creet" ^ string_of_int i) x y Healthy
     in
     let c =
       { id = "creet" ^ string_of_int i

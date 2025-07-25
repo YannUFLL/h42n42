@@ -81,14 +81,7 @@ let%server game_area =
         ~a:
           [ a_id "hospital"
           ; a_style ("height:" ^ string_of_int hospital_height ^ "px") ]
-        []
-    ; div
-        ~a:
-          [ a_id "game_over_screen"
-          ; a_style
-              "display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); color:white; font-size:48px;  align-items:center; justify-content:center; z-index:1000; font-family:sans-serif;"
-          ]
-        [txt "GAME OVER"] ]
+        [] ]
 
 let%client check_collision c1 c2 =
   let dx = c1.x -. c2.x in
@@ -403,11 +396,6 @@ let%client create_creet id x y creet_state =
   done;
   creet, eye_1, eye_2, pupil_1, pupil_2
 
-let%client show_game_over () =
-  Js_of_ocaml.Firebug.console##log (Js.string "💀 show_game_over called!");
-  let elt = Dom_html.getElementById "game_over_screen" in
-  elt##.style##.display := Js.string "flex"
-
 let%client return_to_normal_size creet =
   match creet.state with
   | Healthy ->
@@ -423,60 +411,40 @@ let%client return_to_normal_size creet =
 
 let%client enable_drag creet =
   let open Js_of_ocaml in
-  let doc = Dom_html.document in
-  let game_left = 0. in
-  let game_top = 0. in
-  let game_right = float_of_int game_area_width -. (creet.r_size *. 2.) in
-  let game_bottom = float_of_int game_area_height -. (creet.r_size *. 2.) in
-  let hospital_start = float_of_int (game_area_height - hospital_height) in
-  (* Variables de position du jeu, à récupérer dynamiquement *)
-  let offset_x = ref 0. in
-  let offset_y = ref 0. in
-  let on_move ev =
-    let x_raw = float_of_int ev##.clientX -. !offset_x -. creet.r_size in
-    let y_raw = float_of_int ev##.clientY -. !offset_y -. creet.r_size in
-    let x = max game_left (min game_right x_raw) in
-    let y = max game_top (min game_bottom y_raw) in
-    creet.x <- x;
-    creet.y <- y;
-    creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" x);
-    creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" y);
-    Js._false
-  in
-  let on_up _ev =
-    if creet.y +. creet.r_size >= hospital_start
-    then change_class_state Healthy creet;
-    creet.available <- true;
-    Option.iter Dom_html.removeEventListener creet.move_listener;
-    Option.iter Dom_html.removeEventListener creet.up_listener;
-    creet.move_listener <- None;
-    creet.up_listener <- None;
-    Js._false
-  in
-  let on_down _ev =
-    (* calcul de l’offset du game_area *)
-    (match
-       Dom_html.getElementById_coerce "game_area" Dom_html.CoerceTo.element
-     with
-    | Some area ->
-        let rect = area##getBoundingClientRect in
-        offset_x := rect##.left;
-        offset_y := rect##.top
-    | None -> ());
+  let open Js_of_ocaml_lwt in
+  let open Lwt.Infix in
+  let open Lwt_js_events in
+  (* Fonction récursive qui attend un mousedown, fait le drag, puis se réinscrit *)
+  let rec listen () =
+    mousedown creet.dom >>= fun ev_down ->
     creet.available <- false;
-    creet.move_listener <-
-      Some
-        (Dom_html.addEventListener doc Dom_html.Event.mousemove
-           (Dom_html.handler on_move) Js._false);
-    creet.up_listener <-
-      Some
-        (Dom_html.addEventListener doc Dom_html.Event.mouseup
-           (Dom_html.handler on_up) Js._false);
-    Js._false
+    (* 1) On calcule l’offset entre le coin haut-gauche de la créature et le
+       point de clic *)
+    let offset_x = float_of_int ev_down##.clientX -. creet.x in
+    let offset_y = float_of_int ev_down##.clientY -. creet.y in
+    (* 2) On lance la boucle de drag *)
+    let rec drag_loop () =
+      mousemove Dom_html.document >>= fun ev_move ->
+      let x = float_of_int ev_move##.clientX -. offset_x in
+      let y = float_of_int ev_move##.clientY -. offset_y in
+      creet.x <- x;
+      creet.y <- y;
+      creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" x);
+      creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" y);
+      drag_loop ()
+    in
+    (* 3) On attend le mouseup pour “dropper” la créature *)
+    let drop =
+      mouseup Dom_html.document >|= fun _ev_up -> creet.available <- true
+    in
+    (* 4) On branche drag_loop et drop en parallèle, et on attend que l’un se
+       termine *)
+    Lwt.async (fun () -> Lwt.pick [drag_loop (); drop]);
+    (* 5) Une fois lâchée, on réécoute un nouveau mousedown *)
+    listen ()
   in
-  ignore
-    (Dom_html.addEventListener creet.dom Dom_html.Event.mousedown
-       (Dom_html.handler on_down) Js._false)
+  (* Démarrage de la boucle d’écoute *)
+  Lwt.async listen; ()
 
 let%client update_pupil_position dx dy (pupil1, pupil2) creet =
   let open Js in
@@ -571,7 +539,6 @@ let%client rec game_master_loop game_state =
     || game_state.creets = []
     || not (List.exists (fun c -> c.state = Healthy) game_state.creets)
   then (
-    show_game_over ();
     (match !on_game_end with Some f -> f () | None -> ());
     List.iter
       (fun c -> if not c.is_dead then remove_creet game_state c)

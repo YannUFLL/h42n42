@@ -29,10 +29,11 @@ let%client () = print_endline "Hello"
 [%%client
 let init_client () =
   let open Js_of_ocaml in
+  Lwt.async (fun () -> Main_page.show_tutorial_pages 0);
   let btn_dom : Dom_html.divElement Js.t =
     Dom_html.getElementById "start-button"
   in
-  Game.set_on_game_end_callback (fun () -> Main_page.lock_settings_panel false);
+  Game.set_on_game_end_callback (fun () -> Main_page.reset_game ());
   ignore
     (Js_of_ocaml.Dom_html.addEventListener btn_dom
        Js_of_ocaml.Dom_html.Event.click
@@ -40,7 +41,14 @@ let init_client () =
           Js_of_ocaml.Firebug.console##log (Js.string "clicked !");
           Main_page.lock_settings_panel true;
           Main_page.update_settings_from_inputs ();
+          let btn_dom = Js_of_ocaml.Dom_html.getElementById "start-button" in
+          btn_dom##.textContent := Js.some (Js.string "Relaunch simulation");
           Game.init_client ();
+          Main_page.timer_running := true;
+          let start_time =
+            (Js_of_ocaml.Js.Unsafe.eval_string "Date.now()" : float) /. 1000.
+          in
+          Lwt.async (fun () -> Main_page.show_timer start_time);
           Js._false))
        Js._false);
   Lwt.return_unit]

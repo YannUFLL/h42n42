@@ -52,6 +52,8 @@ let%shared time_to_die = ref 12.0
 let%shared accel_scale = 10000.
 let%shared dup_scale = 10000.
 let%shared time_scale = 1.
+let%client on_game_end : (unit -> unit) option ref = ref None
+let%client set_on_game_end_callback f = on_game_end := Some f
 
 let%server game_area =
   div
@@ -427,9 +429,12 @@ let%client enable_drag creet =
   let game_right = float_of_int game_area_width -. (creet.r_size *. 2.) in
   let game_bottom = float_of_int game_area_height -. (creet.r_size *. 2.) in
   let hospital_start = float_of_int (game_area_height - hospital_height) in
+  (* Variables de position du jeu, à récupérer dynamiquement *)
+  let offset_x = ref 0. in
+  let offset_y = ref 0. in
   let on_move ev =
-    let x_raw = float_of_int ev##.clientX -. creet.r_size in
-    let y_raw = float_of_int ev##.clientY -. creet.r_size in
+    let x_raw = float_of_int ev##.clientX -. !offset_x -. creet.r_size in
+    let y_raw = float_of_int ev##.clientY -. !offset_y -. creet.r_size in
     let x = max game_left (min game_right x_raw) in
     let y = max game_top (min game_bottom y_raw) in
     creet.x <- x;
@@ -449,6 +454,15 @@ let%client enable_drag creet =
     Js._false
   in
   let on_down _ev =
+    (* calcul de l’offset du game_area *)
+    (match
+       Dom_html.getElementById_coerce "game_area" Dom_html.CoerceTo.element
+     with
+    | Some area ->
+        let rect = area##getBoundingClientRect in
+        offset_x := rect##.left;
+        offset_y := rect##.top
+    | None -> ());
     creet.available <- false;
     creet.move_listener <-
       Some
@@ -553,15 +567,25 @@ and maybe_duplicate_creet game_state creet =
 let%client rec game_master_loop game_state =
   let open Lwt in
   if
-    game_state.creets = []
+    (not game_state.is_running)
+    || game_state.creets = []
     || not (List.exists (fun c -> c.state = Healthy) game_state.creets)
   then (
     show_game_over ();
+    (match !on_game_end with Some f -> f () | None -> ());
+    List.iter
+      (fun c -> if not c.is_dead then remove_creet game_state c)
+      game_state.creets;
     game_state.is_running <- false;
     Lwt.return_unit)
   else (
     game_state.timer <- game_state.timer +. 0.02;
     Lwt_js.sleep 0.02 >>= fun () -> game_master_loop game_state)
+
+let%client turn_on_light () =
+  match Dom_html.getElementById_coerce "lens-border" Dom_html.CoerceTo.div with
+  | Some el -> el##.classList##add (Js.string "light-on")
+  | None -> Firebug.console##log (Js.string "[⚠️] lens-border not found")
 
 let%client init_client () =
   Random.self_init ();
@@ -603,6 +627,7 @@ let%client init_client () =
     creets := c :: !creets
   done;
   let game_state = {creets = !creets; is_running = true; timer = 0.0} in
+  turn_on_light ();
   List.iter
     (fun c -> Lwt.async (fun () -> creet_loop game_state c))
     game_state.creets;

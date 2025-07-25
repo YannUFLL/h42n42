@@ -74,7 +74,7 @@ let%shared settings_panel () =
               ; a_input_max (`Number 100) ]
             () ]
     ; label
-        [ txt "Acceleration speed(×10000): "
+        [ txt "Acceleration speed factor: "
         ; input
             ~a:
               [ a_input_type `Number
@@ -88,7 +88,7 @@ let%shared settings_panel () =
               ]
             () ]
     ; label
-        [ txt " Duplication chance (×10000): "
+        [ txt " Duplication chance factor: "
         ; input
             ~a:
               [ a_input_type `Number
@@ -101,7 +101,7 @@ let%shared settings_panel () =
               ; a_input_max (`Number (int_of_float Game.dup_scale)) ]
             () ]
     ; label
-        [ txt "Time before death (s):"
+        [ txt "Time before can death:"
         ; input
             ~a:
               [ a_input_type `Number
@@ -113,6 +113,8 @@ let%shared settings_panel () =
               ; a_input_max (`Number 600) (* max 10 minutes, par ex. *) ]
             () ]
     ; start_button ]
+
+    
 
 let%server main_page () =
   Eliom_content.Html.F.(

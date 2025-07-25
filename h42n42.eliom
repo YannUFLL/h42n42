@@ -32,9 +32,7 @@ let init_client () =
   let btn_dom : Dom_html.divElement Js.t =
     Dom_html.getElementById "start-button"
   in
-  let js_id = Js.to_string btn_dom##.id in
-  Firebug.console##log (Js.string ("✅ Found start_button with id=" ^ js_id));
-  btn_dom##.style##.border := Js.string "3px solid red";
+  Game.set_on_game_end_callback (fun () -> Main_page.lock_settings_panel false);
   ignore
     (Js_of_ocaml.Dom_html.addEventListener btn_dom
        Js_of_ocaml.Dom_html.Event.click

@@ -8,4 +8,4 @@
   ls 
   #echo "===== make test.opt ===="
   #make test.opt 2>&1
-} | clip.exe
+} 

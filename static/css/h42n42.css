@@ -51,6 +51,133 @@ body {
   }
 }
 
+#river {
+    background-image: url("/images/river.png");
+    background-size: contain;      
+    background-repeat:repeat;
+    background-position: center;
+  
+}
+
+#lens-border {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1200px;   
+  height: 1200px;
+  z-index: 2;
+}
+
+#introduction_contenair {
+  position: relative;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+    width: 1024px;
+  height: 415px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: left;
+  z-index: 1;
+}
+
+@media (max-width: 1300px) {
+  body {
+    flex-direction: column;     /* Stack vertically on small screens */
+  }
+}
+
+@media (min-width: 1300px) {
+  body {
+    flex-direction: row;     /* Stack vertically on small screens */
+  }
+}
+
+body {
+  margin: 0; padding: 0;
+  background: #131b24;
+  display: flex;
+  align-items: center;       
+    align-items: flex-start;
+  justify-content: center;   
+  background: url("/images/laboratory.jpg") center;
+  background-size: contain;
+  z-index: 0  ;
+}
+
+#game_title {
+  position: absolute;
+  width: 1024px;
+  height: 415px;
+  justify-content: left;
+  aspect-ratio: 4/1;
+  background: url("/images/title.png") no-repeat center center;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+#lens-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%,
+      rgb(253, 253, 253) 0%,    /* centre blanc (éclairé) */
+      rgb(189, 204, 218) 50%,   /* teinte bleue légère */
+      rgb(73, 111, 188) 55%,      /* bleu-gris léger */
+      rgb(73, 56, 56) 60%      /* périphérie plus sombre, effet “verre” */
+    );
+}
+
+#game_area {
+  position: relative;
+  border-radius: 16px;
+  background: 
+    linear-gradient(120deg, rgba(255,255,255,0.28) 10%, rgba(200,240,255,0.24) 90%),
+    rgba(240, 250, 255, 0.20);
+  /* Optionnel : bordure douce type verre */
+  border: 2px solid rgba(180,220,255,0.32);
+  box-shadow:
+    0 2px 16px 2px rgba(160,220,255,0.09),
+    0 8px 32px 6px rgba(100,140,180,0.12),
+    0 1px 0 0 rgba(255,255,255,0.3) inset,
+    0 0 0 40px rgba(200,220,255,0.07) inset;
+  backdrop-filter: blur(3px) saturate(1.14);  /* effet verre, nécessite support du navigateur */
+  -webkit-backdrop-filter: blur(3px) saturate(1.14);
+  /* Optionnel : effet de reflet doux en haut */
+  overflow: hidden;
+}
+#game-area::before {
+  content: "";
+  position: absolute;
+  left: 12px; top: 8px; right: 12px; height: 24px;
+  border-radius: 12px 12px 60px 60px / 40px 40px 90px 90px;
+  background: linear-gradient(90deg,rgba(255,255,255,0.25) 20%,rgba(255,255,255,0.02) 100%);
+  pointer-events: none;
+  z-index: 2;
+  filter: blur(1px);
+}
+#lens-border::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 20;
+  background: url("/images/arena_border.png") center center no-repeat;
+  background-size: contain;
+  border-radius: 50%;
+  box-shadow: 0 0 48px 6px rgba(180,210,255,0.09) inset;
+}
+#hospital {
+    background-image: url("/images/hospital.png");
+    background-size: contain;    
+    background-repeat: repeat;
+    background-position: center;
+}
+
 .cell-sprite .cell-eye {
   background: rgb(255, 255, 255);
   z-index: 10;
@@ -236,4 +363,128 @@ body {
     transform 10s linear,
     width 9s linear,
     height 9s linear;
+}
+
+/* Settings Panel */
+
+#settings_panel {
+  background: 
+    linear-gradient(120deg, #232b36 0%, #434b55 100%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0 6px, transparent 6px 12px);
+  border: 2.5px solid #1a2330;
+  border-radius: 18px 18px 40px 40px / 14px 14px 40px 40px;
+  box-shadow: 
+    0 12px 28px 0 rgba(30,40,50,0.19),
+    0 2px 12px 0 rgba(0,0,0,0.11) inset;
+  padding: 30px 28px 34px 32px;
+  width: 220px;
+  margin: 40px auto 0 auto;
+  font-family: 'Press Start 2P', monospace;
+  color: #c3cee6;
+  position: relative;
+  z-index: 2;
+}
+
+
+
+/* Titre du panneau façon étiquette instrument */
+#settings_panel_title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: #dde6f7;
+  background: linear-gradient(90deg, #1e2430 0%, #232b36 100%);
+  padding: 8px 0;
+  margin-bottom: 18px;
+  border-radius: 9px;
+  letter-spacing: 0.03em;
+  box-shadow: 0 2px 8px 0 rgba(40,60,80,0.13) inset;
+  text-align: center;
+  border-bottom: 1.5px solid #303a4c;
+}
+
+/* Labels et champs façon instrument scientifique */
+#settings_panel label {
+  display: block;
+  margin-bottom: 17px;
+  position: relative;
+  font-size: 12.5px;
+  color: #c3cee6;
+  text-shadow: 0 1px 0 #1a2130;
+  letter-spacing: 0.02em;
+}
+#settings_panel label::before {
+  content: "⚙️";
+  position: absolute;
+  left: -26px;
+  top: 2px;
+  font-size: 17px;
+  opacity: 0.8;
+}
+
+#settings_panel input[type="number"] {
+  width: 100%;
+  padding: 7px 10px;
+  border: 2px solid #232b36;
+  border-radius: 7px;
+  background: #e0e5eb0d; /* gris très léger, quasi transparent */
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: #c3cee6;
+  margin-top: 2px;
+  box-shadow: 0 1px 0 0 rgba(0,0,0,0.05) inset;
+  transition: border-color 0.18s, background 0.18s;
+}
+#settings_panel input[type="number"]:focus {
+  outline: none;
+  border-color: #85b6ff;
+  background: #202834;
+}
+
+#settings_panel button#start-button {
+  display: block;
+  width: 100%;
+  padding: 11px 0;
+  margin-top: 16px;
+  background: linear-gradient(90deg,#3261b1 0%,#7fa1d9 100%);
+  color: #dde6f7;
+  font-family: inherit;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 2px solid #324477;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(18,30,56,0.25);
+  transition: transform 0.1s, background 0.22s, box-shadow 0.18s;
+}
+
+#settings_panel button#start-button:hover {
+  background: linear-gradient(90deg,#5b90e6 0%,#bdd6fa 100%);
+  box-shadow: 0 6px 16px rgba(44, 84, 148, 0.32);
+  transform: translateY(-1px) scale(1.02);
+}
+
+#settings_panel button#start-button:active {
+  background: #234178;
+  box-shadow: 0 2px 8px rgba(30, 44, 80, 0.15);
+  transform: translateY(0);
+}
+#pillar-support-container {
+  position: relative;
+  width: 640px;    /* slightly wider than settings panel */
+  height: 1320px;
+  margin: 0 auto;
+}
+
+#pillar {
+  position: absolute;
+  width: 1024px;
+  height: 1140px; /* height of the pillar image */
+  left: 50%;
+  top: -420px;    /* décale le pillar pour que le haut soit sous la lentille */
+  transform: translateX(-50%);
+  background: url("/images/pillar.png") no-repeat center top;
+  background-size: contain;
+  z-index: 1;
 }

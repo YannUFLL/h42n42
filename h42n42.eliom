@@ -26,20 +26,28 @@ let%server main_service =
 
 let%client () = print_endline "Hello"
 
-let%server main_page () =
-  Eliom_content.Html.F.(
-    html
-      (head
-         (title (txt "h42n42"))
-         [ css_link
-             ~uri:
-               (make_uri
-                  ~service:(Eliom_service.static_dir ())
-                  ["css"; "h42n42.css"])
-             () ])
-      (body [Game.game_area]))
+[%%client
+let init_client () =
+  let open Js_of_ocaml in
+  let btn_dom : Dom_html.divElement Js.t =
+    Dom_html.getElementById "start-button"
+  in
+  let js_id = Js.to_string btn_dom##.id in
+  Firebug.console##log (Js.string ("✅ Found start_button with id=" ^ js_id));
+  btn_dom##.style##.border := Js.string "3px solid red";
+  ignore
+    (Js_of_ocaml.Dom_html.addEventListener btn_dom
+       Js_of_ocaml.Dom_html.Event.click
+       (Js_of_ocaml.Dom_html.handler (fun _ev ->
+          Js_of_ocaml.Firebug.console##log (Js.string "clicked !");
+          Main_page.lock_settings_panel true;
+          Main_page.update_settings_from_inputs ();
+          Game.init_client ();
+          Js._false))
+       Js._false);
+  Lwt.return_unit]
 
 let%server () =
   App.register ~service:main_service (fun () () ->
-    let _ = [%client (Game.init_client () : unit)] in
-    Lwt.return (main_page ()))
+    let _ = [%client (init_client () : unit Lwt.t)] in
+    Lwt.return (Main_page.main_page ()))

@@ -29,26 +29,29 @@ type creet =
 type game_state =
   {mutable creets : creet list; mutable is_running : bool; mutable timer : float}]
 
-let%shared creet_base_radius = 20
 let%shared r_growing_speed = 0.1
-let%shared river_height = 50
-let%shared hospital_height = 50
-let%shared game_area_height = 600
-let%shared game_area_width = 600
-let%shared playground_height = 500
+let%shared river_height = 80
+let%shared hospital_height = 80
+let%shared game_area_height = 800
+let%shared game_area_width = 800
+let%shared playground_height = 640
 let%shared mean_color = "violet"
 let%shared berserk_color = "orange"
 let%shared infected_color = "green"
 let%shared healthy_color = "gray"
-let%shared game_acceleration = 0.0005
 let%shared direction_change_probability = 0.005
-let%shared creet_duplication_chance = 0.0001
-let%shared number_of_creet_at_start = 5
-let%shared time_to_die : float = 12.0
 let%shared mean_reduce_factor = 0.85
 let%shared mean_speed_acceleration = 0.0005
 let%shared shrink_speed = 0.01
 let%shared death_random_factor = 0.01
+let%shared creet_duplication_chance = ref 0.0001
+let%shared game_acceleration = ref 0.0005
+let%shared creet_base_radius = ref 20
+let%shared number_of_creet_at_start = ref 5
+let%shared time_to_die = ref 12.0
+let%shared accel_scale = 10000.
+let%shared dup_scale = 10000.
+let%shared time_scale = 1.
 
 let%server game_area =
   div
@@ -62,10 +65,7 @@ let%server game_area =
           ^ "px;") ]
     [ div
         ~a:
-          [ a_id "river"
-          ; a_style
-              ("height:" ^ string_of_int river_height ^ "px; background:blue;")
-          ]
+          [a_id "river"; a_style ("height:" ^ string_of_int river_height ^ "px")]
         []
     ; div
         ~a:
@@ -73,14 +73,12 @@ let%server game_area =
           ; a_style
               ("height:"
               ^ string_of_int playground_height
-              ^ "px; background:white; position:relative;") ]
+              ^ "px; position:relative;") ]
         []
     ; div
         ~a:
           [ a_id "hospital"
-          ; a_style
-              ("height:" ^ string_of_int hospital_height ^ "px; background:red;")
-          ]
+          ; a_style ("height:" ^ string_of_int hospital_height ^ "px") ]
         []
     ; div
         ~a:
@@ -202,7 +200,7 @@ let%client infect_creet game_state creet =
   | Mean ->
       creet.dx <- creet.dx *. 0.85;
       creet.dy <- creet.dy *. 0.85;
-      creet.r_size <- float_of_int creet_base_radius *. mean_reduce_factor;
+      creet.r_size <- float_of_int !creet_base_radius *. mean_reduce_factor;
       let px = string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px" in
       creet.dom##.style##.width := Js.string px;
       creet.dom##.style##.height := Js.string px;
@@ -263,18 +261,18 @@ let%client check_border_collision creet =
 let%client handle_infected_creet game_state creet =
   match creet.state with
   | Berserk ->
-      if creet.r_size < float_of_int (4 * creet_base_radius)
+      if creet.r_size < float_of_int (4 * !creet_base_radius)
       then (
         creet.r_size <- creet.r_size +. r_growing_speed;
         creet.dom##.style##.width
         := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px");
         creet.dom##.style##.height
         := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px"));
-      if Random.float 1.0 < 0.0 then spawn_phage creet
+      if Random.float 1.0 < 0.01 then spawn_phage creet
   | Mean -> (
-      if creet.state = Infected && Random.float 1.0 < 0.000
+      if creet.state = Infected && Random.float 1.0 < 0.005
       then spawn_phage creet;
-      if creet.r_size > float_of_int creet_base_radius *. mean_reduce_factor
+      if creet.r_size > float_of_int !creet_base_radius *. mean_reduce_factor
       then (
         creet.dom##.style##.width
         := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px");
@@ -293,7 +291,7 @@ let%client handle_infected_creet game_state creet =
           creet.dy <- dy /. dist *. speed
       | None -> ())
   | Infected ->
-      if creet.state = Infected && Random.float 1.0 < 0.000
+      if creet.state = Infected && Random.float 1.0 < 0.005
       then spawn_phage creet
   | _ -> ()
 
@@ -327,7 +325,7 @@ let%client check_alive game_state creet =
   if creet.state = Infected || creet.state = Berserk || creet.state = Mean
   then
     let dt = game_state.timer -. creet.infected_time in
-    if dt > time_to_die && Random.float 1.0 < death_random_factor
+    if dt > !time_to_die && Random.float 1.0 < death_random_factor
     then remove_creet game_state creet
 
 let%client rec generate_unique_id game_state =
@@ -351,7 +349,7 @@ let%client create_creet id x y creet_state =
   creet##.style##.position := Js.string "absolute";
   creet##.style##.left := Js.string (Printf.sprintf "%dpx" x);
   creet##.style##.top := Js.string (Printf.sprintf "%dpx" y);
-  let px = string_of_int (creet_base_radius * 2) ^ "px" in
+  let px = string_of_int (!creet_base_radius * 2) ^ "px" in
   creet##.style##.width := Js.string px;
   creet##.style##.height := Js.string px;
   set_scatter_vars creet;
@@ -411,7 +409,7 @@ let%client show_game_over () =
 let%client return_to_normal_size creet =
   match creet.state with
   | Healthy ->
-      let base = float_of_int creet_base_radius in
+      let base = float_of_int !creet_base_radius in
       if creet.r_size > base
       then creet.r_size <- max base (creet.r_size -. r_growing_speed)
       else if creet.r_size < base
@@ -494,7 +492,7 @@ let%client rec creet_loop (game_state : game_state) creet =
     if creet.available && not creet.is_dead
     then (
       let speed = sqrt ((creet.dx *. creet.dx) +. (creet.dy *. creet.dy)) in
-      let new_speed = speed +. game_acceleration in
+      let new_speed = speed +. !game_acceleration in
       if speed > 0.0
       then (
         let ratio = new_speed /. speed in
@@ -518,7 +516,7 @@ let%client rec creet_loop (game_state : game_state) creet =
     Lwt_js.sleep 0.02 >>= fun () -> creet_loop game_state creet)
 
 and maybe_duplicate_creet game_state creet =
-  if creet.state = Healthy && Random.float 1.0 < creet_duplication_chance
+  if creet.state = Healthy && Random.float 1.0 < !creet_duplication_chance
   then (
     let id = generate_unique_id game_state in
     let x = creet.x +. float_of_int (Random.int 30 - 15) in
@@ -537,7 +535,7 @@ and maybe_duplicate_creet game_state creet =
       ; state = Healthy
       ; available = true
       ; is_dead = false
-      ; r_size = float_of_int creet_base_radius
+      ; r_size = float_of_int !creet_base_radius
       ; infected_time = 0.0
       ; move_listener = None
       ; up_listener = None
@@ -568,11 +566,11 @@ let%client rec game_master_loop game_state =
 let%client init_client () =
   Random.self_init ();
   let creets = ref [] in
-  for i = 0 to number_of_creet_at_start - 1 do
-    let x = Random.int game_area_width - (creet_base_radius * 2) in
+  for i = 0 to !number_of_creet_at_start - 1 do
+    let x = Random.int game_area_width - (!creet_base_radius * 2) in
     let y =
       Random.int
-        (game_area_height - (river_height * 4) - (creet_base_radius * 2))
+        (game_area_height - (river_height * 4) - (!creet_base_radius * 2))
       + river_height
     in
     let dx = (2.0 *. Random.float 1.0) -. 1.0 in
@@ -590,7 +588,7 @@ let%client init_client () =
       ; state = (if infected then Infected else Healthy)
       ; available = true
       ; is_dead = false
-      ; r_size = float_of_int creet_base_radius
+      ; r_size = float_of_int !creet_base_radius
       ; infected_time = 0.0
       ; move_listener = None
       ; up_listener = None

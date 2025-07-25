@@ -304,6 +304,9 @@ let%client random_rotation creet =
 
 let%client remove_creet game_state creet =
   creet.is_dead <- true;
+  (match creet.drag_switch with
+  | Some sw -> Lwt_switch.turn_off sw |> ignore
+  | None -> ());
   creet.dom##.classList##add (Js.string "explode");
   let on_end _ev =
     (match Js.Opt.to_option creet.dom##.parentNode with
@@ -414,6 +417,7 @@ let%client enable_drag creet =
   let open Js_of_ocaml_lwt in
   let open Lwt.Infix in
   let open Lwt_js_events in
+  let hospital_start = float_of_int (game_area_height - hospital_height) in
   (* Fonction récursive qui attend un mousedown, fait le drag, puis se réinscrit *)
   let rec listen () =
     mousedown creet.dom >>= fun ev_down ->
@@ -435,7 +439,10 @@ let%client enable_drag creet =
     in
     (* 3) On attend le mouseup pour “dropper” la créature *)
     let drop =
-      mouseup Dom_html.document >|= fun _ev_up -> creet.available <- true
+      mouseup Dom_html.document >|= fun _ev_up ->
+      creet.available <- true;
+      if creet.y +. creet.r_size >= hospital_start
+      then change_class_state Healthy creet
     in
     (* 4) On branche drag_loop et drop en parallèle, et on attend que l’un se
        termine *)
@@ -550,9 +557,13 @@ let%client rec game_master_loop game_state =
     Lwt_js.sleep 0.02 >>= fun () -> game_master_loop game_state)
 
 let%client turn_on_light () =
-  match Dom_html.getElementById_coerce "lens-border" Dom_html.CoerceTo.div with
-  | Some el -> el##.classList##add (Js.string "light-on")
-  | None -> Firebug.console##log (Js.string "[⚠️] lens-border not found")
+  let open Js_of_ocaml in
+  let add_light_class id =
+    match Dom_html.getElementById_coerce id Dom_html.CoerceTo.div with
+    | Some el -> el##.classList##add (Js.string "light-on")
+    | None -> Firebug.console##log (Js.string ("[⚠️] element not found: " ^ id))
+  in
+  List.iter add_light_class ["lens-border"; "game_title"; "river"; "hospital"]
 
 let%client init_client () =
   Random.self_init ();

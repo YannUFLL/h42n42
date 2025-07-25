@@ -49,7 +49,11 @@
     background-size: contain;      
     background-repeat:repeat;
     background-position: center;
-  
+    opacity: 0.2;
+}
+
+#river.light-on {
+  opacity: 1 ;
 }
 
 #lens-border {
@@ -134,13 +138,22 @@ body {
   width: 1024px;
   height: 416px;
   max-width: 500px;
-  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  position: absolute;
+  opacity: 0;
   justify-content: left;
+  z-index: 0;
   width: 100%;
   aspect-ratio: 1;
   background: url("/images/title.png") no-repeat center center;
   background-size: contain;
   background-repeat: no-repeat;
+}
+
+#game_title.light-on {
+  opacity: 0.2;
+  z-index: 0;
 }
 
 #lens-border::before {
@@ -166,6 +179,7 @@ body {
 #game_area {
   position: relative;
   border-radius: 16px;
+  z-index: 1;
   background: 
     linear-gradient(120deg, rgba(255,255,255,0.28) 10%, rgba(200,240,255,0.24) 90%),
     rgba(240, 250, 255, 0.20);
@@ -207,7 +221,13 @@ body {
     background-size: contain;    
     background-repeat: repeat;
     background-position: center;
+    opacity: 0.2;
 }
+
+#hospital.light-on {
+  opacity: 1 ;
+}
+
 
 .cell-sprite .cell-eye {
   background: rgb(255, 255, 255);

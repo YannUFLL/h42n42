@@ -192,9 +192,7 @@ let%server main_page () =
                   ["css"; "h42n42.css"])
              () ])
       (body
-         [ div
-             ~a:[a_id "introduction_contenair"; a_class ["side"]]
-             [div ~a:[a_id "game_title"] []]
+         [ div ~a:[a_id "introduction_contenair"; a_class ["side"]] []
          ; div
              ~a:[a_id "game_contenair"]
              [ div
@@ -202,7 +200,8 @@ let%server main_page () =
                  [ Game.game_area
                  ; div
                      ~a:[a_id "side-screen"]
-                     [div ~a:[a_id "side-screen-content"] [txt "Booting..."]] ]
+                     [div ~a:[a_id "side-screen-content"] [txt "Booting..."]]
+                 ; div ~a:[a_id "game_title"] [] ]
              ; div
                  ~a:[a_id "pillar-support-container"]
                  [div ~a:[a_id "pillar"] [settings_panel ()]] ]

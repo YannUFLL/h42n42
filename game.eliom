@@ -30,11 +30,11 @@ type game_state =
   {mutable creets : creet list; mutable is_running : bool; mutable timer : float}]
 
 let%shared r_growing_speed = 0.1
-let%shared river_height = 80
-let%shared hospital_height = 80
-let%shared game_area_height = 800
-let%shared game_area_width = 800
-let%shared playground_height = 640
+let%shared river_height = 50
+let%shared hospital_height = 50
+let%shared game_area_height = 500
+let%shared game_area_width = 500
+let%shared playground_height = 400
 let%shared mean_color = "violet"
 let%shared berserk_color = "orange"
 let%shared infected_color = "green"

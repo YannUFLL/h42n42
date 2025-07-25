@@ -127,10 +127,32 @@ let%server main_page () =
                   ["css"; "h42n42.css"])
              () ])
       (body
-         [ div ~a:[a_id "introduction_contenair"] [div ~a:[a_id "game_title"] []]
+         [ div
+             ~a:[a_id "introduction_contenair"; a_class ["side"]]
+             [ div ~a:[a_id "game_title"] []
+             ; div
+                 ~a:[a_id "game_description"]
+                 [ p [txt "Welcome to H42N42 — Lab Protocol #42."]
+                 ; p
+                     [ txt
+                         "You are observing a controlled population of micro-organisms under the lens. An unknown virus, codenamed H42N42, has begun spreading from the upper contamination zone — the river."
+                     ]
+                 ; p
+                     [ txt
+                         "Your role: interact with the sample in real-time. Isolate infected cells by moving them to the healing area. Protect the healthy ones — they reproduce spontaneously as long as they stay uninfected."
+                     ]
+                 ; p
+                     [ txt
+                         "Be warned: infected specimens may mutate. Some grow out of control (Berserk), others become aggressive (Mean) and chase healthy cells."
+                     ]
+                 ; p
+                     [ txt
+                         "Delay the outbreak as long as possible. When no healthy cells remain... the simulation ends."
+                     ] ] ]
          ; div
              ~a:[a_id "game_contenair"]
              [ div ~a:[a_id "lens-border"] [Game.game_area]
              ; div
                  ~a:[a_id "pillar-support-container"]
-                 [div ~a:[a_id "pillar"] []; settings_panel ()] ] ]))
+                 [div ~a:[a_id "pillar"] [settings_panel ()]] ]
+         ; div ~a:[a_class ["side"]] [] ]))

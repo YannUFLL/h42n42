@@ -18,13 +18,6 @@
     background-color: blue;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-
 .creet {
   border-radius: 50%;
   z-index: 10;
@@ -64,20 +57,24 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1200px;   
-  height: 1200px;
+  width: 750px;   
+  flex: 0;
+  height: 750px;
   z-index: 2;
+}
+
+.side {
+  flex: 1; /* prend tout l'espace dispo à gauche et droite */
 }
 
 #introduction_contenair {
   position: relative;
   top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
-    width: 1024px;
-  height: 415px;
+  height: 100%;
   flex-direction: column;
   align-items: center;
-  justify-content: left;
+  justify-content: space-around;
   z-index: 1;
 }
 
@@ -92,25 +89,50 @@ body {
     flex-direction: row;     /* Stack vertically on small screens */
   }
 }
+html, body {
+  height: 100%;
+}
 
 body {
   margin: 0; padding: 0;
+  overflow: hidden;
   background: #131b24;
   display: flex;
+  height: 100%;
   align-items: center;       
     align-items: flex-start;
   justify-content: center;   
   background: url("/images/laboratory.jpg") center;
-  background-size: contain;
+  background-size: cover;
   z-index: 0  ;
 }
 
+#game_description {
+  position: relative;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 640px;
+  padding: 20px 28px;
+  margin: 10px auto;
+  background: rgba(20, 30, 40, 0.75); /* Fond sombre + lisible */
+  color: #dde6f7;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  text-align: center;
+  border-radius: 14px;
+  line-height: 1.6;
+  box-shadow: 0 0 12px rgba(0,0,0,0.25);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
 #game_title {
-  position: absolute;
   width: 1024px;
-  height: 415px;
+  height: 416px;
+  max-width: 500px;
+  position: relative;
   justify-content: left;
-  aspect-ratio: 4/1;
+  width: 100%;
+  aspect-ratio: 1;
   background: url("/images/title.png") no-repeat center center;
   background-size: contain;
   background-repeat: no-repeat;
@@ -373,15 +395,19 @@ body {
     repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0 6px, transparent 6px 12px);
   border: 2.5px solid #1a2330;
   border-radius: 18px 18px 40px 40px / 14px 14px 40px 40px;
+  left: 46.5%;
+  scale: 0.8;
   box-shadow: 
     0 12px 28px 0 rgba(30,40,50,0.19),
     0 2px 12px 0 rgba(0,0,0,0.11) inset;
   padding: 30px 28px 34px 32px;
   width: 220px;
+  margin: auto;
+    transform: translateX(-50%)  scale(0.8);
   margin: 40px auto 0 auto;
   font-family: 'Press Start 2P', monospace;
   color: #c3cee6;
-  position: relative;
+  position: absolute;
   z-index: 2;
 }
 
@@ -397,6 +423,7 @@ body {
   margin-bottom: 18px;
   border-radius: 9px;
   letter-spacing: 0.03em;
+
   box-shadow: 0 2px 8px 0 rgba(40,60,80,0.13) inset;
   text-align: center;
   border-bottom: 1.5px solid #303a4c;
@@ -407,7 +434,7 @@ body {
   display: block;
   margin-bottom: 17px;
   position: relative;
-  font-size: 12.5px;
+  font-size: 17.5px;
   color: #c3cee6;
   text-shadow: 0 1px 0 #1a2130;
   letter-spacing: 0.02em;
@@ -429,7 +456,7 @@ body {
   background: #e0e5eb0d; /* gris très léger, quasi transparent */
   box-sizing: border-box;
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 17.5px;
   color: #c3cee6;
   margin-top: 2px;
   box-shadow: 0 1px 0 0 rgba(0,0,0,0.05) inset;
@@ -470,20 +497,10 @@ body {
   box-shadow: 0 2px 8px rgba(30, 44, 80, 0.15);
   transform: translateY(0);
 }
-#pillar-support-container {
-  position: relative;
-  width: 640px;    /* slightly wider than settings panel */
-  height: 1320px;
-  margin: 0 auto;
-}
-
 #pillar {
-  position: absolute;
-  width: 1024px;
-  height: 1140px; /* height of the pillar image */
-  left: 50%;
-  top: -420px;    /* décale le pillar pour que le haut soit sous la lentille */
-  transform: translateX(-50%);
+  width: 750px;
+  height: 750px; /* height of the pillar image */
+  transform: translateY(-100px);
   background: url("/images/pillar.png") no-repeat center top;
   background-size: contain;
   z-index: 1;

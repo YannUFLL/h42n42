@@ -24,10 +24,14 @@ type creet =
   ; mutable eye_2 : Dom_html.divElement Js.t
   ; mutable pupil_1 : Dom_html.divElement Js.t
   ; mutable pupil_2 : Dom_html.divElement Js.t
-  ; mutable phage_list : Dom_html.divElement Js.t list }
+  ; mutable phage_list : Dom_html.divElement Js.t list
+  ; mutable listener : unit Lwt.t option }
 
 type game_state =
-  {mutable creets : creet list; mutable is_running : bool; mutable timer : float}]
+  { mutable creets : creet list
+  ; mutable is_running : bool
+  ; mutable timer : float
+  ; drag_controller : creet Drag.t }]
 
 let%shared r_growing_speed = 0.1
 let%shared river_height = 50
@@ -54,6 +58,7 @@ let%shared dup_scale = 10000.
 let%shared time_scale = 1.
 let%client on_game_end : (unit -> unit) option ref = ref None
 let%client set_on_game_end_callback f = on_game_end := Some f
+let%client hospital_line = float_of_int (game_area_height - hospital_height)
 
 let%server game_area =
   div
@@ -304,10 +309,8 @@ let%client random_rotation creet =
 
 let%client remove_creet game_state creet =
   creet.is_dead <- true;
-  (match creet.drag_switch with
-  | Some sw -> Lwt_switch.turn_off sw |> ignore
-  | None -> ());
   creet.dom##.classList##add (Js.string "explode");
+  Drag.dettach game_state.drag_controller creet;
   let on_end _ev =
     (match Js.Opt.to_option creet.dom##.parentNode with
     | Some parent -> Dom.removeChild parent creet.dom
@@ -318,6 +321,23 @@ let%client remove_creet game_state creet =
   ignore
     (Dom_html.addEventListener creet.dom Dom_html.Event.animationend
        (Dom_html.handler on_end) Js._false)
+
+let%client creet_callbacks =
+  { Drag.on_start = (fun c _ _ -> c.available <- false)
+  ; on_move =
+      (fun c x y ->
+        c.x <- x;
+        c.y <- y;
+        c.dom##.style##.left := Js.string (Printf.sprintf "%fpx" x);
+        c.dom##.style##.top := Js.string (Printf.sprintf "%fpx" y))
+  ; on_end =
+      (fun c y ->
+        c.available <- true;
+        if y +. c.r_size >= hospital_line then change_class_state Healthy c)
+  ; get_pos = (fun c -> c.x, c.y)
+  ; get_dom = (fun c -> c.dom)
+  ; get_listener = (fun c -> c.listener)
+  ; set_listener = (fun c listener -> c.listener <- listener) }
 
 let%client check_alive game_state creet =
   if creet.state = Infected || creet.state = Berserk || creet.state = Mean
@@ -412,47 +432,6 @@ let%client return_to_normal_size creet =
       creet.dom##.style##.height := Js.string px
   | _ -> ()
 
-let%client enable_drag creet =
-  let open Js_of_ocaml in
-  let open Js_of_ocaml_lwt in
-  let open Lwt.Infix in
-  let open Lwt_js_events in
-  let hospital_start = float_of_int (game_area_height - hospital_height) in
-  (* Fonction récursive qui attend un mousedown, fait le drag, puis se réinscrit *)
-  let rec listen () =
-    mousedown creet.dom >>= fun ev_down ->
-    creet.available <- false;
-    (* 1) On calcule l’offset entre le coin haut-gauche de la créature et le
-       point de clic *)
-    let offset_x = float_of_int ev_down##.clientX -. creet.x in
-    let offset_y = float_of_int ev_down##.clientY -. creet.y in
-    (* 2) On lance la boucle de drag *)
-    let rec drag_loop () =
-      mousemove Dom_html.document >>= fun ev_move ->
-      let x = float_of_int ev_move##.clientX -. offset_x in
-      let y = float_of_int ev_move##.clientY -. offset_y in
-      creet.x <- x;
-      creet.y <- y;
-      creet.dom##.style##.left := Js.string (Printf.sprintf "%fpx" x);
-      creet.dom##.style##.top := Js.string (Printf.sprintf "%fpx" y);
-      drag_loop ()
-    in
-    (* 3) On attend le mouseup pour “dropper” la créature *)
-    let drop =
-      mouseup Dom_html.document >|= fun _ev_up ->
-      creet.available <- true;
-      if creet.y +. creet.r_size >= hospital_start
-      then change_class_state Healthy creet
-    in
-    (* 4) On branche drag_loop et drop en parallèle, et on attend que l’un se
-       termine *)
-    Lwt.async (fun () -> Lwt.pick [drag_loop (); drop]);
-    (* 5) Une fois lâchée, on réécoute un nouveau mousedown *)
-    listen ()
-  in
-  (* Démarrage de la boucle d’écoute *)
-  Lwt.async listen; ()
-
 let%client update_pupil_position dx dy (pupil1, pupil2) creet =
   let open Js in
   let base_amp = 30.0 in
@@ -533,9 +512,10 @@ and maybe_duplicate_creet game_state creet =
       ; eye_2
       ; pupil_1
       ; pupil_2
-      ; phage_list = [] }
+      ; phage_list = []
+      ; listener = None }
     in
-    enable_drag new_creet;
+    Drag.attach game_state.drag_controller creet;
     Lwt.async (fun () -> creet_loop game_state new_creet);
     game_state.creets <- new_creet :: game_state.creets)
 
@@ -568,6 +548,8 @@ let%client turn_on_light () =
 let%client init_client () =
   Random.self_init ();
   let creets = ref [] in
+  let drag_controller = Drag.create creet_callbacks in
+  Drag.attach_global_listeners drag_controller;
   for i = 0 to !number_of_creet_at_start - 1 do
     let x = Random.int game_area_width - (!creet_base_radius * 2) in
     let y =
@@ -599,12 +581,15 @@ let%client init_client () =
       ; eye_2
       ; pupil_1
       ; pupil_2
-      ; phage_list = [] }
+      ; phage_list = []
+      ; listener = None }
     in
-    enable_drag c;
+    Drag.attach drag_controller c;
     creets := c :: !creets
   done;
-  let game_state = {creets = !creets; is_running = true; timer = 0.0} in
+  let game_state =
+    {creets = !creets; is_running = true; timer = 0.0; drag_controller}
+  in
   turn_on_light ();
   List.iter
     (fun c -> Lwt.async (fun () -> creet_loop game_state c))

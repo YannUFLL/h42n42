@@ -59,6 +59,9 @@ let%shared time_scale = 1.
 let%client on_game_end : (unit -> unit) option ref = ref None
 let%client set_on_game_end_callback f = on_game_end := Some f
 let%client hospital_line = float_of_int (game_area_height - hospital_height)
+let%client drag_controller = ref None
+let%shared creet_base_speed = ref 0.2
+let%shared creet_random_speed_range = ref 0.1
 
 let%server game_area =
   div
@@ -89,10 +92,15 @@ let%server game_area =
         [] ]
 
 let%client check_collision c1 c2 =
-  let dx = c1.x -. c2.x in
-  let dy = c1.y -. c2.y in
-  let dist2 = sqrt ((dx *. dx) +. (dy *. dy)) in
-  dist2 < c1.r_size +. c2.r_size
+  let center c = c.x +. c.r_size, c.y +. c.r_size in
+  let x1, y1 = center c1 in
+  let x2, y2 = center c2 in
+  let dx = x1 -. x2 in
+  let dy = y1 -. y2 in
+  let dist2 = (dx *. dx) +. (dy *. dy) in
+  let rsum = c1.r_size +. c2.r_size in
+  let coll = dist2 < rsum *. rsum in
+  coll
 
 let%client set_scatter_vars (elt : #Dom_html.element Js.t) : unit =
   let angle = Random.float 360. in
@@ -270,8 +278,7 @@ let%client handle_infected_creet game_state creet =
         := Js.string (string_of_int (int_of_float (creet.r_size *. 2.)) ^ "px"));
       if Random.float 1.0 < 0.01 then spawn_phage creet
   | Mean -> (
-      if creet.state = Infected && Random.float 1.0 < 0.005
-      then spawn_phage creet;
+      if Random.float 1.0 < 0.005 then spawn_phage creet;
       if creet.r_size > float_of_int !creet_base_radius *. mean_reduce_factor
       then (
         creet.dom##.style##.width
@@ -489,8 +496,8 @@ and maybe_duplicate_creet game_state creet =
     let id = generate_unique_id game_state in
     let x = creet.x +. float_of_int (Random.int 30 - 15) in
     let y = creet.y +. float_of_int (Random.int 30 - 15) in
-    let dx = (2.0 *. Random.float 1.0) -. 1.0 in
-    let dy = (2.0 *. Random.float 1.0) -. 1.0 in
+    let dx = creet.dx in
+    let dy = creet.dy in
     let dom, eye_1, eye_2, pupil_1, pupil_2 =
       create_creet id (int_of_float x) (int_of_float y) creet.state
     in
@@ -515,7 +522,7 @@ and maybe_duplicate_creet game_state creet =
       ; phage_list = []
       ; listener = None }
     in
-    Drag.attach game_state.drag_controller creet;
+    Drag.attach game_state.drag_controller new_creet;
     Lwt.async (fun () -> creet_loop game_state new_creet);
     game_state.creets <- new_creet :: game_state.creets)
 
@@ -548,8 +555,15 @@ let%client turn_on_light () =
 let%client init_client () =
   Random.self_init ();
   let creets = ref [] in
-  let drag_controller = Drag.create creet_callbacks in
-  Drag.attach_global_listeners drag_controller;
+  let drag_controller =
+    match !drag_controller with
+    | Some drag_controller -> drag_controller
+    | None ->
+        let controller = Drag.create creet_callbacks in
+        drag_controller := Some controller;
+        Drag.attach_global_listeners controller;
+        controller
+  in
   for i = 0 to !number_of_creet_at_start - 1 do
     let x = Random.int game_area_width - (!creet_base_radius * 2) in
     let y =
@@ -557,8 +571,14 @@ let%client init_client () =
         (game_area_height - (river_height * 4) - (!creet_base_radius * 2))
       + river_height
     in
-    let dx = (2.0 *. Random.float 1.0) -. 1.0 in
-    let dy = (2.0 *. Random.float 1.0) -. 1.0 in
+    let angle = Random.float (2. *. Float.pi) in
+    let speed =
+      let base = !creet_base_speed in
+      let range = !creet_random_speed_range in
+      max 0. (base +. ((Random.float 2. -. 1.) *. range))
+    in
+    let dx = cos angle *. speed in
+    let dy = sin angle *. speed in
     let infected = false in
     let dom, eye_1, eye_2, pupil_1, pupil_2 =
       create_creet ("creet" ^ string_of_int i) x y Healthy

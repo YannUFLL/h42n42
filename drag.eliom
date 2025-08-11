@@ -18,7 +18,8 @@ type 'a t =
   ; mutable current : 'a option
   ; mutable offset : float * float
   ; layer : Dom_html.divElement Js.t
-  ; original_parent : Dom_html.divElement Js.t }
+  ; original_parent : Dom_html.divElement Js.t
+  ; mutable playground_offset : float * float }
 
 let make_drag_layer () : Dom_html.divElement Js.t =
   let layer_node =
@@ -39,11 +40,16 @@ let create callbacks original_parent =
   ; current = None
   ; offset = 0., 0.
   ; layer = make_drag_layer ()
-  ; original_parent }
+  ; original_parent
+  ; playground_offset = 0., 0. }
 
 let compute_offset t ev =
   let dom = t.cb.get_dom (Option.get t.current) in
   let r = dom##getBoundingClientRect in
+  let playground_x, playground_y = t.cb.get_pos (Option.get t.current) in
+  t.playground_offset <-
+    ( float_of_int ev##.clientX -. playground_x
+    , float_of_int ev##.clientY -. playground_y );
   t.offset <-
     float_of_int ev##.clientX -. r##.left, float_of_int ev##.clientY -. r##.top
 
@@ -60,6 +66,9 @@ let handle_up t ev _ =
   | None -> Lwt.return_unit
   | Some elt ->
       Dom.appendChild t.original_parent (t.cb.get_dom elt);
+      t.cb.on_move elt
+        (float_of_int ev##.clientX -. fst t.playground_offset)
+        (float_of_int ev##.clientY -. snd t.playground_offset);
       t.current <- None;
       let _, dy = t.offset in
       let y = float_of_int ev##.clientY -. dy in

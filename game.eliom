@@ -3,6 +3,8 @@ open Eliom_content.Html.F
 [%%client
 open Js_of_ocaml
 open Js_of_ocaml_lwt
+open Js_of_ocaml_tyxml.Tyxml_js.Html
+open Js_of_ocaml_tyxml.Tyxml_js
 
 type creet_state = Healthy | Infected | Berserk | Mean
 
@@ -152,8 +154,6 @@ let%client change_class_state new_state creet : unit =
   creet.dom##.className := Js.string ("cell-sprite " ^ state_class)
 
 let%client spawn_phage creet =
-  let ph = Dom_html.createDiv Dom_html.document in
-  ph##.className := Js.string "phage";
   let creet_radius = creet.r_size in
   let phage_size = 20. in
   let center = creet_radius -. (phage_size /. 2.) in
@@ -161,11 +161,19 @@ let%client spawn_phage creet =
   let dist = creet_radius *. 0.8 *. Random.float 1.0 in
   let x = center +. (cos angle *. dist) in
   let y = center +. (sin angle *. dist) in
-  ph##.style##.left := Js.string (Printf.sprintf "%fpx" x);
-  ph##.style##.top := Js.string (Printf.sprintf "%fpx" y);
-  Dom.appendChild creet.dom ph;
-  creet.phage_list <- ph :: creet.phage_list;
-  set_scatter_vars ph
+  let ph_node =
+    div
+      ~a:
+        [ a_class ["phage"]
+        ; a_style
+            ("left:" ^ Printf.sprintf "%fpx" x ^ ";top:"
+           ^ Printf.sprintf "%fpx" y ^ ";") ]
+      []
+  in
+  let ph_dom = To_dom.of_div ph_node in
+  Dom.appendChild creet.dom ph_dom;
+  creet.phage_list <- ph_dom :: creet.phage_list;
+  set_scatter_vars ph_dom
 
 let%client random_eye_deform eye =
   let should_move = Random.float 1.0 < 0.75 in
@@ -360,9 +368,6 @@ let%client rec generate_unique_id game_state =
   else id
 
 let%client create_creet id x y creet_state =
-  let playground = Dom_html.getElementById "game_area" in
-  let creet = Dom_html.createDiv Dom_html.document in
-  creet##.id := Js.string id;
   let state_class =
     match creet_state with
     | Healthy -> "healthy"
@@ -370,61 +375,78 @@ let%client create_creet id x y creet_state =
     | Berserk -> "berserk"
     | Mean -> "mean"
   in
-  creet##.className := Js.string ("cell-sprite " ^ state_class);
-  creet##.style##.position := Js.string "absolute";
-  creet##.style##.left := Js.string (Printf.sprintf "%dpx" x);
-  creet##.style##.top := Js.string (Printf.sprintf "%dpx" y);
   let px = string_of_int (!creet_base_radius * 2) ^ "px" in
-  creet##.style##.width := Js.string px;
-  creet##.style##.height := Js.string px;
-  set_scatter_vars creet;
-  let mk_eye eye_class =
-    let eye = Dom_html.createDiv Dom_html.document in
-    eye##.className := Js.string ("cell-eye " ^ eye_class);
-    eye##.style##.position := Js.string "absolute";
-    eye##.style##.borderRadius := Js.string "50%";
-    (Js.Unsafe.coerce eye##.style)##.boxShadow := Js.string "0 0 4px 1px #222";
-    let pupil = Dom_html.createDiv Dom_html.document in
-    pupil##.className := Js.string "cell-pupil";
-    pupil##.style##.position := Js.string "absolute";
-    pupil##.style##.background := Js.string "#111";
-    pupil##.style##.borderRadius := Js.string "50%";
-    Dom.appendChild eye pupil;
-    eye, pupil
+  let mk_eye side_class =
+    let pupil_node =
+      div
+        ~a:
+          [ a_class ["cell-pupil"]
+          ; a_style "position:absolute;background:#111;border-radius:50%" ]
+        []
+    in
+    let eye_node =
+      div
+        ~a:
+          [ a_class ["cell-eye"; side_class]
+          ; a_style "position:absolute;border-radius:50%" ]
+        [pupil_node]
+    in
+    let eye_dom = To_dom.of_div eye_node in
+    let pupil_dom = To_dom.of_div pupil_node in
+    eye_node, eye_dom, pupil_dom
   in
-  let eye_1, pupil_1 = mk_eye "cell-eye-left" in
-  let eye_2, pupil_2 = mk_eye "cell-eye-right" in
-  Dom.appendChild creet eye_1;
-  Dom.appendChild creet eye_2;
-  set_scatter_vars eye_1;
-  set_scatter_vars eye_2;
-  set_scatter_vars pupil_1;
-  set_scatter_vars pupil_2;
-  Dom.appendChild playground creet;
-  let core = Dom_html.createDiv Dom_html.document in
-  core##.className := Js.string "cell-core";
-  let left_p = 20. +. Random.float 20. in
-  let top_p = 40. +. Random.float 20. in
-  let size_p = 20. +. Random.float 30. in
-  core##.style##.left := Js.string (Printf.sprintf "%.1f%%" left_p);
-  core##.style##.top := Js.string (Printf.sprintf "%.1f%%" top_p);
-  core##.style##.width := Js.string (Printf.sprintf "%.1f%%" size_p);
-  core##.style##.height := Js.string (Printf.sprintf "%.1f%%" size_p);
-  Dom.appendChild creet core;
-  set_scatter_vars core;
-  for _ = 1 to 5 do
-    let g = Dom_html.createDiv Dom_html.document in
-    g##.className := Js.string "granule";
-    let px = 20. +. Random.float 60. in
-    let py = 20. +. Random.float 60. in
-    g##.style##.left := Js.string (Printf.sprintf "%.1f%%" px);
-    g##.style##.top := Js.string (Printf.sprintf "%.1f%%" py);
-    let delay = Random.float 2.0 in
-    g##.style##.animationDelay := Js.string (Printf.sprintf "%.2fs" delay);
-    Dom.appendChild creet g;
-    set_scatter_vars g
-  done;
-  creet, eye_1, eye_2, pupil_1, pupil_2
+  let eye_1_node, eye_1_dom, pupil_1_dom = mk_eye "cell-eye-left" in
+  let eye_2_node, eye_2_dom, pupil_2_dom = mk_eye "cell-eye-right" in
+  let left_p = 20. +. Random.float 20.
+  and top_p = 40. +. Random.float 20.
+  and size_p = 20. +. Random.float 30. in
+  let core_node =
+    div
+      ~a:
+        [ a_class ["cell-core"]
+        ; a_style
+            (Printf.sprintf "left:%.1f%%;top:%.1f%%;width:%.1f%%;height:%.1f%%;"
+               left_p top_p size_p size_p) ]
+      []
+  in
+  let granule_nodes =
+    let one () =
+      let px = 20. +. Random.float 60. in
+      let py = 20. +. Random.float 60. in
+      let delay = Random.float 2.0 in
+      div
+        ~a:
+          [ a_class ["granule"]
+          ; a_style
+              (Printf.sprintf "left:%.1f%%;top:%.1f%%;animation-delay:%.2fs;" px
+                 py delay) ]
+        []
+    in
+    List.init 5 (fun _ -> one ())
+  in
+  let creet_node =
+    div
+      ~a:
+        [ a_id id
+        ; a_class ["cell-sprite"; state_class]
+        ; a_style
+            ("position:absolute;" ^ "left:" ^ string_of_int x ^ "px;" ^ "top:"
+           ^ string_of_int y ^ "px;" ^ "width:" ^ px ^ ";" ^ "height:" ^ px
+           ^ ";") ]
+      (eye_1_node :: eye_2_node :: core_node :: granule_nodes)
+  in
+  let creet_dom = To_dom.of_div creet_node in
+  let playground = Dom_html.getElementById "game_area" in
+  Dom.appendChild playground creet_dom;
+  set_scatter_vars (creet_dom :> Dom_html.element Js.t);
+  set_scatter_vars (eye_1_dom :> Dom_html.element Js.t);
+  set_scatter_vars (eye_2_dom :> Dom_html.element Js.t);
+  set_scatter_vars (pupil_1_dom :> Dom_html.element Js.t);
+  set_scatter_vars (pupil_2_dom :> Dom_html.element Js.t);
+  List.iter
+    (fun g -> set_scatter_vars (To_dom.of_div g :> Dom_html.element Js.t))
+    granule_nodes;
+  creet_dom, eye_1_dom, eye_2_dom, pupil_1_dom, pupil_2_dom
 
 let%client return_to_normal_size creet =
   match creet.state with

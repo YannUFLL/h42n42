@@ -42,18 +42,17 @@ let create callbacks original_parent =
   ; original_parent }
 
 let compute_offset t ev =
-  let mouse_x = float_of_int ev##.clientX in
-  let mouse_y = float_of_int ev##.clientY in
-  let obj_x, obj_y = t.cb.get_pos (Option.get t.current) in
-  t.offset <- mouse_x -. obj_x, mouse_y -. obj_y
+  let dom = t.cb.get_dom (Option.get t.current) in
+  let r = dom##getBoundingClientRect in
+  t.offset <-
+    float_of_int ev##.clientX -. r##.left, float_of_int ev##.clientY -. r##.top
 
 let handle_move t ev _ =
   match t.current with
   | None -> Lwt.return_unit
   | Some elt ->
-      let dx, dy = t.offset in
-      let x = float_of_int ev##.clientX -. dx in
-      let y = float_of_int ev##.clientY -. dy in
+      let x = float_of_int ev##.clientX -. fst t.offset in
+      let y = float_of_int ev##.clientY -. snd t.offset in
       t.cb.on_move elt x y; Lwt.return_unit
 
 let handle_up t ev _ =
@@ -75,8 +74,11 @@ let start_drag t elt ev =
   Dom.preventDefault ev;
   t.current <- Some elt;
   let dom = t.cb.get_dom elt in
-  Dom.appendChild t.layer dom;
   compute_offset t ev;
+  Dom.appendChild t.layer dom;
+  t.cb.on_move elt
+    (float_of_int ev##.clientX -. fst t.offset)
+    (float_of_int ev##.clientY -. snd t.offset);
   let obj_x, obj_y = t.cb.get_pos elt in
   t.cb.on_start elt obj_x obj_y;
   Lwt.return_unit

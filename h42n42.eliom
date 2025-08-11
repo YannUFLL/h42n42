@@ -34,6 +34,7 @@ let init_client () =
     Dom_html.getElementById "start-button"
   in
   Game.set_on_game_end_callback (fun () -> Main_page.reset_game ());
+  Main_page.register_clamp_input_handler ();
   ignore
     (Js_of_ocaml.Dom_html.addEventListener btn_dom
        Js_of_ocaml.Dom_html.Event.click

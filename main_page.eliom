@@ -117,6 +117,28 @@ let%shared settings_panel () =
             () ]
     ; start_button ]
 
+let%client register_clamp_input_handler () =
+  let clamp_input id min_val max_val =
+    match Dom_html.getElementById_coerce id Dom_html.CoerceTo.input with
+    | None -> ()
+    | Some input ->
+        input##.oninput :=
+          Dom_html.handler (fun _ ->
+            let v = Js.parseFloat input##.value in
+            if classify_float v = FP_nan
+            then Js._false
+            else
+              let v' = max min_val (min max_val v) in
+              if v' <> v
+              then input##.value := Js.string (string_of_int (int_of_float v'));
+              Js._false)
+  in
+  clamp_input "input_num_creet" 1. 100.;
+  clamp_input "input_base_radius" 5. 100.;
+  clamp_input "input_acceleration" 0. 10.;
+  clamp_input "input_duplication" 0. 100.;
+  clamp_input "input_time_to_die" 1. 600.
+
 let%client tutorial_pages =
   [| "Booting.", 0.4
    ; "Booting..", 0.4

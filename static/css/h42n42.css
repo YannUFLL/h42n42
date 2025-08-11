@@ -411,6 +411,7 @@ body {
 }
 
 .cell-eye {
+    box-shadow: 0 0 4px 1px #222; 
   transition:
     transform 10s linear,
     width 9s linear,

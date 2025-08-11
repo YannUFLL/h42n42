@@ -1,6 +1,8 @@
 [%%client
 open Js_of_ocaml
 open Js_of_ocaml_lwt
+open Js_of_ocaml_tyxml.Tyxml_js.Html
+open Js_of_ocaml_tyxml.Tyxml_js
 
 type 'a callbacks =
   { on_start : 'a -> float -> float -> unit
@@ -14,9 +16,30 @@ type 'a callbacks =
 type 'a t =
   { cb : 'a callbacks
   ; mutable current : 'a option
-  ; mutable offset : float * float }
+  ; mutable offset : float * float
+  ; layer : Dom_html.divElement Js.t
+  ; original_parent : Dom_html.divElement Js.t }
 
-let create callbacks = {cb = callbacks; current = None; offset = 0., 0.}
+let make_drag_layer () : Dom_html.divElement Js.t =
+  let layer_node =
+    div
+      ~a:
+        [ a_id "drag-layer"
+        ; a_style
+            "position:fixed;left:0;top:0;right:0;bottom:0;z-index:999999;pointer-events:none;"
+        ]
+      []
+  in
+  let layer_dom = To_dom.of_div layer_node in
+  Dom.appendChild Dom_html.document##.body layer_dom;
+  layer_dom
+
+let create callbacks original_parent =
+  { cb = callbacks
+  ; current = None
+  ; offset = 0., 0.
+  ; layer = make_drag_layer ()
+  ; original_parent }
 
 let compute_offset t ev =
   let mouse_x = float_of_int ev##.clientX in
@@ -37,6 +60,7 @@ let handle_up t ev _ =
   match t.current with
   | None -> Lwt.return_unit
   | Some elt ->
+      Dom.appendChild t.original_parent (t.cb.get_dom elt);
       t.current <- None;
       let _, dy = t.offset in
       let y = float_of_int ev##.clientY -. dy in
@@ -50,6 +74,8 @@ let attach_global_listeners t =
 let start_drag t elt ev =
   Dom.preventDefault ev;
   t.current <- Some elt;
+  let dom = t.cb.get_dom elt in
+  Dom.appendChild t.layer dom;
   compute_offset t ev;
   let obj_x, obj_y = t.cb.get_pos elt in
   t.cb.on_start elt obj_x obj_y;

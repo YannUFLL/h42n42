@@ -581,7 +581,9 @@ let%client init_client () =
     match !drag_controller with
     | Some drag_controller -> drag_controller
     | None ->
-        let controller = Drag.create creet_callbacks in
+        let controller =
+          Drag.create creet_callbacks (Dom_html.getElementById "game_area")
+        in
         drag_controller := Some controller;
         Drag.attach_global_listeners controller;
         controller

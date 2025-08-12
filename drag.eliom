@@ -43,8 +43,6 @@ let get_scale (el : #Dom_html.element Js.t) : float * float =
   let rect_h = Js.Optdef.get rect##.height (fun () -> oh) in
   let sx = if ow = 0. then 1. else rect_w /. ow in
   let sy = if oh = 0. then 1. else rect_h /. oh in
-  Js_of_ocaml.Firebug.console##log
-    (Js.string (Printf.sprintf "Scale: (%f, %f)" sx sy));
   sx, sy
 
 let create callbacks original_parent =
@@ -80,8 +78,6 @@ let end_drag t ev : unit Lwt.t =
       t.current <- None;
       t.layer##.style##.pointerEvents := Js.string "none";
       Dom_html.document##.body##.classList##remove (Js.string "is-dragging");
-      Js_of_ocaml.Firebug.console##log
-        (Js.string (Printf.sprintf "End drag at (%f, %f)" x y));
       t.cb.on_end elt y;
       Lwt.return_unit
 

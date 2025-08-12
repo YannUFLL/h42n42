@@ -286,7 +286,7 @@ body {
   position: relative;
   display: block;
   overflow: visible;
-  border: 3px, solid;
+  border: 3px solid;
   border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
     transition: background 0.3s ease, border-color 0.3s ease;
 }

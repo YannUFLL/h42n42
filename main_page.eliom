@@ -188,7 +188,9 @@ let%client rec show_timer (start : float) =
   let txt = Printf.sprintf "<b>Time elapsed:</b><br>%.1f s" elapsed in
   set_side_screen_page txt;
   if !timer_running
-  then Lwt_js.sleep 0.1 >>= fun () -> show_timer start
+  then
+    Lwt_js.sleep 0.1 >>= fun () ->
+    if !timer_running then show_timer start else Lwt.return_unit
   else Lwt.return_unit
 
 let%client reset_game () =
@@ -199,7 +201,14 @@ let%client reset_game () =
     -. !start_time
   in
   set_side_screen_page
-    (Printf.sprintf "<b>Simulation ended!</b><br><br>Time: %.1f s" elapsed)
+    (Printf.sprintf
+       "<div style='text-align:center; font-family:sans-serif;'>
+      <h3 style='color:#e74c3c; font-size:1.4em; margin:0;'>☠ Game Over ☠</h3>
+      <p style='font-size:1em; margin:0; color:#555;'>
+         Time: <b style='color:#2c3e50;'>%.1f s</b>
+      </p>
+    </div>"
+       elapsed)
 
 let%server main_page () =
   Eliom_content.Html.F.(

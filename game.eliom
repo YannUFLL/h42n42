@@ -154,8 +154,8 @@ let%client change_class_state new_state creet : unit =
   creet.dom##.className := Js.string ("cell-sprite " ^ state_class)
 
 let%client spawn_phage creet =
-  let creet_radius = creet.r_size in
-  let phage_size = 20. in
+  let creet_radius = creet.r_size +. 1.5 in
+  let phage_size = 12. in
   let center = creet_radius -. (phage_size /. 2.) in
   let angle = Random.float (2. *. Float.pi) in
   let dist = creet_radius *. 0.8 *. Random.float 1.0 in

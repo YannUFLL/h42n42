@@ -53,26 +53,34 @@ let compute_offset t ev =
   t.offset <-
     float_of_int ev##.clientX -. r##.left, float_of_int ev##.clientY -. r##.top
 
-let handle_move t ev _ =
-  match t.current with
-  | None -> Lwt.return_unit
-  | Some elt ->
-      let x = float_of_int ev##.clientX -. fst t.offset in
-      let y = float_of_int ev##.clientY -. snd t.offset in
-      t.cb.on_move elt x y; Lwt.return_unit
-
-let handle_up t ev _ =
+let end_drag t ev : unit Lwt.t =
   match t.current with
   | None -> Lwt.return_unit
   | Some elt ->
       Dom.appendChild t.original_parent (t.cb.get_dom elt);
-      (* print coordinateur *)
       t.cb.on_move elt
         (float_of_int ev##.clientX -. fst t.playground_offset)
         (float_of_int ev##.clientY -. snd t.playground_offset);
       t.current <- None;
       let y = float_of_int ev##.clientY -. snd t.playground_offset in
-      t.cb.on_end elt y; Lwt.return_unit
+      t.cb.on_end elt y;
+      t.layer##.style##.pointerEvents := Js.string "none";
+      Dom_html.document##.body##.classList##remove (Js.string "is-dragging");
+      Lwt.return_unit
+
+let handle_move t ev _ =
+  match t.current with
+  | None -> Lwt.return_unit
+  | Some elt ->
+      if ev##.button = 1
+      then end_drag t ev
+      else
+        let x = float_of_int ev##.clientX -. fst t.offset in
+        let y = float_of_int ev##.clientY -. snd t.offset in
+        t.cb.on_move elt x y; Lwt.return_unit
+
+let handle_up t ev _ =
+  match t.current with None -> Lwt.return_unit | Some _ -> end_drag t ev
 
 let attach_global_listeners t =
   Lwt.async (fun () ->
@@ -96,12 +104,11 @@ let start_drag t elt ev =
   dom##.style##.top
   := Js.string (Printf.sprintf "%fpx" (r_elt##.top -. r_layer##.top));
   compute_offset t ev;
-  Dom.appendChild t.layer dom;
   t.cb.on_move elt
     (float_of_int ev##.clientX -. fst t.offset)
     (float_of_int ev##.clientY -. snd t.offset);
-  let obj_x, obj_y = t.cb.get_pos elt in
-  t.cb.on_start elt obj_x obj_y;
+  t.layer##.style##.pointerEvents := Js.string "auto";
+  Dom_html.document##.body##.classList##add (Js.string "is-dragging");
   Lwt.return_unit
 
 let abort_current_drag (t : 'a t) (elt : 'a) =
@@ -118,7 +125,9 @@ let abort_current_drag (t : 'a t) (elt : 'a) =
       dom##.style##.left := Js.string (Printf.sprintf "%fpx" x);
       dom##.style##.top := Js.string (Printf.sprintf "%fpx" y);
       Dom.appendChild t.original_parent dom;
-      t.current <- None
+      t.current <- None;
+      t.layer##.style##.pointerEvents := Js.string "none";
+      Dom_html.document##.body##.classList##remove (Js.string "is-dragging")
   | _ -> ()
 
 let attach t elt =

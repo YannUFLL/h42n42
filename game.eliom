@@ -508,7 +508,7 @@ let%client create_creet id x y creet_state =
 
 let%client return_to_normal_size creet =
   match creet.state with
-  | Healthy ->
+  | Healthy | Infected | Mean ->
       let base = float_of_int !creet_base_radius in
       if creet.r_size > base
       then creet.r_size <- max base (creet.r_size -. r_growing_speed)

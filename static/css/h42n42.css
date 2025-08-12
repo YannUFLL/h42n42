@@ -86,7 +86,7 @@
 @media (max-height: 1200px) {
  body {
     transform-origin: top center;
-    /* transform: scale(0.78); */
+    transform: scale(0.78);
   }
 }
 

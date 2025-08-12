@@ -245,9 +245,7 @@ let%client random_eye_deform eye =
     eye##.style##.height := Js.string "40%");
   ()
 
-let%client infect_creet ?(reason = "unknown") game_state creet =
-  Js_of_ocaml.Firebug.console##log
-    (Js.string ("Infecting creet for reason: " ^ reason));
+let%client infect_creet game_state creet =
   let n = Random.int 10 in
   let new_state =
     if n = 0
@@ -290,7 +288,7 @@ let%client propagate_infection game_state creet =
            && (not target.is_dead)
            && check_collision creet target
            && Random.int 100 < 2
-         then infect_creet ~reason:"propagation" game_state target)
+         then infect_creet game_state target)
       game_state.creets
 
 let%client closest_healthy_creet creet creets =
@@ -363,7 +361,7 @@ let%client handle_infected_creet game_state creet =
 
 let%client check_river game_state creet =
   if creet.state = Healthy && creet.y <= float_of_int river_height
-  then infect_creet ~reason:"river" game_state creet
+  then infect_creet game_state creet
 
 let%client random_rotation creet =
   if Random.float 1.0 < direction_change_probability

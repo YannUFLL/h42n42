@@ -66,12 +66,12 @@ let handle_up t ev _ =
   | None -> Lwt.return_unit
   | Some elt ->
       Dom.appendChild t.original_parent (t.cb.get_dom elt);
+      (* print coordinateur *)
       t.cb.on_move elt
         (float_of_int ev##.clientX -. fst t.playground_offset)
         (float_of_int ev##.clientY -. snd t.playground_offset);
       t.current <- None;
-      let _, dy = t.offset in
-      let y = float_of_int ev##.clientY -. dy in
+      let y = float_of_int ev##.clientY -. snd t.playground_offset in
       t.cb.on_end elt y; Lwt.return_unit
 
 let attach_global_listeners t =
@@ -83,6 +83,18 @@ let start_drag t elt ev =
   Dom.preventDefault ev;
   t.current <- Some elt;
   let dom = t.cb.get_dom elt in
+  let obj_x, obj_y = t.cb.get_pos elt in
+  t.cb.on_start elt obj_x obj_y;
+  ignore dom##.offsetWidth;
+  dom##.classList##add (Js.string "dragging");
+  let r_elt = dom##getBoundingClientRect in
+  let r_layer = (t.layer :> Dom_html.element Js.t)##getBoundingClientRect in
+  Dom.appendChild t.layer dom;
+  dom##.style##.position := Js.string "absolute";
+  dom##.style##.left
+  := Js.string (Printf.sprintf "%fpx" (r_elt##.left -. r_layer##.left));
+  dom##.style##.top
+  := Js.string (Printf.sprintf "%fpx" (r_elt##.top -. r_layer##.top));
   compute_offset t ev;
   Dom.appendChild t.layer dom;
   t.cb.on_move elt
@@ -91,6 +103,23 @@ let start_drag t elt ev =
   let obj_x, obj_y = t.cb.get_pos elt in
   t.cb.on_start elt obj_x obj_y;
   Lwt.return_unit
+
+let abort_current_drag (t : 'a t) (elt : 'a) =
+  match t.current with
+  | Some e when e == elt ->
+      let dom = t.cb.get_dom elt in
+      dom##.classList##remove (Js.string "dragging");
+      let r = dom##getBoundingClientRect in
+      let pr =
+        (t.original_parent :> Dom_html.element Js.t)##getBoundingClientRect
+      in
+      let x = r##.left -. pr##.left in
+      let y = r##.top -. pr##.top in
+      dom##.style##.left := Js.string (Printf.sprintf "%fpx" x);
+      dom##.style##.top := Js.string (Printf.sprintf "%fpx" y);
+      Dom.appendChild t.original_parent dom;
+      t.current <- None
+  | _ -> ()
 
 let attach t elt =
   let dom = t.cb.get_dom elt in

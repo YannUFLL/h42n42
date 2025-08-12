@@ -175,6 +175,55 @@ let%client spawn_phage creet =
   creet.phage_list <- ph_dom :: creet.phage_list;
   set_scatter_vars ph_dom
 
+let%client get_cs (el : Dom_html.element Js.t) =
+  Dom_html.window##getComputedStyle el
+
+let%client inline_prop (el : Dom_html.element Js.t) (prop : string) =
+  let cs = get_cs el in
+  let v = Js.to_string (cs##getPropertyValue (Js.string prop)) in
+  ignore (el##.style##setProperty (Js.string prop) (Js.string v) Js.undefined)
+
+let%client clear_prop (el : Dom_html.element Js.t) (prop : string) =
+  ignore (el##.style##removeProperty (Js.string prop))
+
+let%client freeze_creet (c : creet) =
+  let e = (c.dom :> Dom_html.element Js.t) in
+  let eye1 = (c.eye_1 :> Dom_html.element Js.t)
+  and eye2 = (c.eye_2 :> Dom_html.element Js.t) in
+  List.iter (inline_prop e) ["border-radius"];
+  let snap_eye el =
+    List.iter (inline_prop el) ["transform"; "width"; "height"]
+  in
+  snap_eye eye1;
+  snap_eye eye2;
+  List.iter
+    (fun ph ->
+       let ph_e = (ph :> Dom_html.element Js.t) in
+       inline_prop ph_e "transform";
+       inline_prop ph_e "opacity")
+    c.phage_list;
+  e##.classList##add (Js.string "dragging")
+
+let%client unfreeze_creet (c : creet) =
+  let e = (c.dom :> Dom_html.element Js.t) in
+  let eye1 = (c.eye_1 :> Dom_html.element Js.t)
+  and eye2 = (c.eye_2 :> Dom_html.element Js.t) in
+  e##.classList##remove (Js.string "dragging");
+  let%lwt () = Lwt_js.sleep 0.0 in
+  List.iter (clear_prop e) ["border-radius"];
+  let clear_eye el =
+    List.iter (clear_prop el) ["transform"; "width"; "height"]
+  in
+  clear_eye eye1;
+  clear_eye eye2;
+  List.iter
+    (fun ph ->
+       let ph_e = (ph :> Dom_html.element Js.t) in
+       clear_prop ph_e "transform";
+       clear_prop ph_e "opacity")
+    c.phage_list;
+  Lwt.return_unit
+
 let%client random_eye_deform eye =
   let should_move = Random.float 1.0 < 0.75 in
   let should_resize = Random.float 1.0 < 0.5 in
@@ -322,23 +371,30 @@ let%client random_rotation creet =
     creet.dx <- cos angle *. speed;
     creet.dy <- sin angle *. speed)
 
-let%client remove_creet game_state creet =
-  creet.is_dead <- true;
-  creet.dom##.classList##add (Js.string "explode");
-  Drag.dettach game_state.drag_controller creet;
-  let on_end _ev =
-    (match Js.Opt.to_option creet.dom##.parentNode with
-    | Some parent -> Dom.removeChild parent creet.dom
+let%client remove_creet game_state c =
+  (match !drag_controller with
+  | Some d -> Drag.abort_current_drag d c
+  | None -> ());
+  Drag.dettach game_state.drag_controller c;
+  c.is_dead <- true;
+  c.dom##.classList##remove (Js.string "dragging");
+  c.dom##.classList##add (Js.string "explode");
+  let on_end _ =
+    (match Js.Opt.to_option c.dom##.parentNode with
+    | Some parent -> Dom.removeChild parent c.dom
     | None -> ());
-    game_state.creets <- List.filter (fun c -> c != creet) game_state.creets;
+    game_state.creets <- List.filter (( != ) c) game_state.creets;
     Js._false
   in
   ignore
-    (Dom_html.addEventListener creet.dom Dom_html.Event.animationend
+    (Dom_html.addEventListener c.dom Dom_html.Event.animationend
        (Dom_html.handler on_end) Js._false)
 
 let%client creet_callbacks =
-  { Drag.on_start = (fun c _ _ -> c.available <- false)
+  { Drag.on_start =
+      (fun c _ _ ->
+        c.available <- false;
+        freeze_creet c)
   ; on_move =
       (fun c x y ->
         c.x <- x;
@@ -348,11 +404,13 @@ let%client creet_callbacks =
   ; on_end =
       (fun c y ->
         c.available <- true;
-        if y +. c.r_size >= hospital_line then change_class_state Healthy c)
+        Lwt.async (fun () -> unfreeze_creet c);
+        if y +. (c.r_size *. 2.) >= hospital_line
+        then change_class_state Healthy c)
   ; get_pos = (fun c -> c.x, c.y)
   ; get_dom = (fun c -> c.dom)
   ; get_listener = (fun c -> c.listener)
-  ; set_listener = (fun c listener -> c.listener <- listener) }
+  ; set_listener = (fun c l -> c.listener <- l) }
 
 let%client check_alive game_state creet =
   if creet.state = Infected || creet.state = Berserk || creet.state = Mean
